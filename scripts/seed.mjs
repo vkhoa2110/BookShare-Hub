@@ -18,7 +18,7 @@ const users = [
   {
     id: '10000000-0000-4000-8000-000000000001',
     email: 'admin@booksharehub.com',
-    fullName: 'Quan tri vien',
+    fullName: 'Quản trị viên',
     phone: '0900000001',
     role: 'admin',
     points: 20,
@@ -26,7 +26,7 @@ const users = [
   {
     id: '10000000-0000-4000-8000-000000000002',
     email: 'hung@booksharehub.com',
-    fullName: 'Nguyen Phi Hung',
+    fullName: 'Nguyễn Phi Hùng',
     phone: '0900000002',
     role: 'member',
     points: 30,
@@ -34,7 +34,7 @@ const users = [
   {
     id: '10000000-0000-4000-8000-000000000003',
     email: 'khoa@booksharehub.com',
-    fullName: 'Le Van Khoa',
+    fullName: 'Lê Văn Khoa',
     phone: '0900000003',
     role: 'member',
     points: 25,
@@ -42,7 +42,7 @@ const users = [
   {
     id: '10000000-0000-4000-8000-000000000004',
     email: 'huy@booksharehub.com',
-    fullName: 'Dinh Viet Huy',
+    fullName: 'Đinh Viết Huy',
     phone: '0900000004',
     role: 'member',
     points: 15,
@@ -58,7 +58,7 @@ const users = [
   {
     id: '10000000-0000-4000-8000-000000000006',
     email: 'hieu@booksharehub.com',
-    fullName: 'Bui Trung Hieu',
+    fullName: 'Bùi Trung Hiếu',
     phone: '0900000006',
     role: 'member',
     points: 20,
@@ -66,14 +66,14 @@ const users = [
 ]
 
 const books = [
-  ['20000000-0000-4000-8000-000000000001', users[2].id, 'Dac Nhan Tam', 'Ky nang', 'Dale Carnegie', 2021, 'good', 'available'],
-  ['20000000-0000-4000-8000-000000000002', users[1].id, 'Nha Gia Kim', 'Tieu thuyet', 'Paulo Coelho', 2020, 'used', 'available'],
-  ['20000000-0000-4000-8000-000000000003', users[3].id, 'Clean Code', 'Lap trinh', 'Robert C. Martin', 2019, 'good', 'available'],
-  ['20000000-0000-4000-8000-000000000004', users[4].id, 'Tuoi Tre Dang Gia Bao Nhieu', 'Truyen cam hung', 'Rosie Nguyen', 2022, 'new', 'available'],
-  ['20000000-0000-4000-8000-000000000005', users[5].id, 'Atomic Habits', 'Ky nang', 'James Clear', 2023, 'good', 'negotiating'],
-  ['20000000-0000-4000-8000-000000000006', users[2].id, 'SQL for Data Analysis', 'Du lieu', 'Cathy Tanimura', 2021, 'used', 'borrowed'],
-  ['20000000-0000-4000-8000-000000000007', users[1].id, 'Toi Thay Hoa Vang Tren Co Xanh', 'Van hoc', 'Nguyen Nhat Anh', 2018, 'good', 'exchanged'],
-  ['20000000-0000-4000-8000-000000000008', users[0].id, 'Designing Data-Intensive Applications', 'He thong', 'Martin Kleppmann', 2020, 'good', 'available'],
+  ['20000000-0000-4000-8000-000000000001', users[2].id, 'Đắc Nhân Tâm', 'Kỹ năng', 'Dale Carnegie', 2021, 'good', 'available'],
+  ['20000000-0000-4000-8000-000000000002', users[1].id, 'Nhà Giả Kim', 'Tiểu thuyết', 'Paulo Coelho', 2020, 'used', 'available'],
+  ['20000000-0000-4000-8000-000000000003', users[3].id, 'Clean Code', 'Lập trình', 'Robert C. Martin', 2019, 'good', 'available'],
+  ['20000000-0000-4000-8000-000000000004', users[4].id, 'Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Truyền cảm hứng', 'Rosie Nguyễn', 2022, 'new', 'available'],
+  ['20000000-0000-4000-8000-000000000005', users[5].id, 'Atomic Habits', 'Kỹ năng', 'James Clear', 2023, 'good', 'negotiating'],
+  ['20000000-0000-4000-8000-000000000006', users[2].id, 'SQL for Data Analysis', 'Dữ liệu', 'Cathy Tanimura', 2021, 'used', 'borrowed'],
+  ['20000000-0000-4000-8000-000000000007', users[1].id, 'Tôi Thấy Hoa Vàng Trên Cỏ Xanh', 'Văn học', 'Nguyễn Nhật Ánh', 2018, 'good', 'exchanged'],
+  ['20000000-0000-4000-8000-000000000008', users[0].id, 'Designing Data-Intensive Applications', 'Hệ thống', 'Martin Kleppmann', 2020, 'good', 'available'],
 ]
 
 const transactions = [
@@ -116,17 +116,25 @@ const transactions = [
 ]
 
 const deliveries = [
-  ['40000000-0000-4000-8000-000000000001', transactions[0].id, null, null, null, 'Thu vien tang 2', 'Sanh nha A', 'open', null],
-  ['40000000-0000-4000-8000-000000000002', transactions[1].id, users[4].id, now, now, 'Phong CLB sach', 'Khu tu hoc B1', 'delivered', now],
+  ['40000000-0000-4000-8000-000000000001', transactions[0].id, null, null, null, 'Thư viện tầng 2', 'Sảnh nhà A', 'open', null],
+  ['40000000-0000-4000-8000-000000000002', transactions[1].id, users[4].id, now, now, 'Phòng CLB sách', 'Khu tự học B1', 'delivered', now],
 ]
 
 const ledger = [
-  ['60000000-0000-4000-8000-000000000001', users[1].id, transactions[2].id, null, 10, 30, 'Cong diem trao doi vinh vien'],
-  ['60000000-0000-4000-8000-000000000002', users[4].id, transactions[2].id, null, -10, 10, 'Tru diem nhan sach trao doi'],
-  ['60000000-0000-4000-8000-000000000003', users[2].id, transactions[1].id, null, 5, 25, 'Cong diem cho muon sach'],
-  ['60000000-0000-4000-8000-000000000004', users[3].id, transactions[1].id, null, -5, 15, 'Tru diem muon sach'],
-  ['60000000-0000-4000-8000-000000000005', users[4].id, null, deliveries[1][0], 2, 12, 'Cong diem giao sach mien phi'],
+  ['60000000-0000-4000-8000-000000000001', users[1].id, transactions[2].id, null, 10, 30, 'Cộng điểm trao đổi vĩnh viễn'],
+  ['60000000-0000-4000-8000-000000000002', users[4].id, transactions[2].id, null, -10, 10, 'Trừ điểm nhận sách trao đổi'],
+  ['60000000-0000-4000-8000-000000000003', users[2].id, transactions[1].id, null, 5, 25, 'Cộng điểm cho mượn sách'],
+  ['60000000-0000-4000-8000-000000000004', users[3].id, transactions[1].id, null, -5, 15, 'Trừ điểm mượn sách'],
+  ['60000000-0000-4000-8000-000000000005', users[4].id, null, deliveries[1][0], 2, 12, 'Cộng điểm giao sách miễn phí'],
 ]
+
+const transactionHistory = transactions.map((transaction, index) => [
+  `70000000-0000-4000-8000-00000000000${index + 1}`,
+  transaction.id,
+  transaction.status,
+  transaction.borrowerId,
+  transaction.status === 'completed' ? 'Dữ liệu mẫu: giao dịch đã hoàn tất' : 'Dữ liệu mẫu: tạo yêu cầu',
+])
 
 await client.connect()
 
@@ -205,7 +213,20 @@ try {
         gen_random_uuid(),
         $1::text,
         $1::uuid,
-        jsonb_build_object('sub', $1::text, 'email', $2::text, 'email_verified', true, 'phone_verified', false),
+        jsonb_build_object(
+          'sub',
+          $1::text,
+          'email',
+          $2::text,
+          'full_name',
+          $3::text,
+          'phone_number',
+          $4::text,
+          'email_verified',
+          true,
+          'phone_verified',
+          false
+        ),
         'email',
         now(),
         now(),
@@ -215,7 +236,7 @@ try {
         identity_data = excluded.identity_data,
         updated_at = now()
       `,
-      [user.id, user.email],
+      [user.id, user.email, user.fullName, user.phone],
     )
 
     await client.query(
@@ -321,6 +342,22 @@ try {
       ],
     )
 
+  }
+
+  await client.query(
+    `
+    delete from public.transaction_history
+    where transaction_id = any($1::uuid[])
+      and (
+        id::text like '70000000-0000-4000-8000-00000000000%'
+        or note like 'Du lieu mau:%'
+        or note like 'Dữ liệu mẫu:%'
+      )
+    `,
+    [transactions.map((transaction) => transaction.id)],
+  )
+
+  for (const entry of transactionHistory) {
     await client.query(
       `
       insert into public.transaction_history (
@@ -330,15 +367,15 @@ try {
         updated_by_account_id,
         note
       )
-      values (gen_random_uuid(), $1, $2, $3, $4)
-      on conflict do nothing
+      values ($1, $2, $3, $4, $5)
+      on conflict (id) do update set
+        transaction_id = excluded.transaction_id,
+        status_updated_to = excluded.status_updated_to,
+        updated_by_account_id = excluded.updated_by_account_id,
+        note = excluded.note,
+        updated_at = now()
       `,
-      [
-        transaction.id,
-        transaction.status,
-        transaction.borrowerId,
-        transaction.status === 'completed' ? 'Du lieu mau: giao dich da hoan tat' : 'Du lieu mau: tao yeu cau',
-      ],
+      entry,
     )
   }
 
@@ -387,7 +424,7 @@ try {
       $1,
       $2,
       $3,
-      'Muon doi dia diem giao sach vi lich hoc bi thay doi.',
+      'Muốn đổi địa điểm giao sách vì lịch học bị thay đổi.',
       'open',
       null
     )
