@@ -1,3 +1,10 @@
+---
+title: BookShare Hub
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # BookShare Hub
 
 Web app trao đổi sách cho câu lạc bộ đọc sách, triển khai bằng React + Vite và lưu dữ liệu trên Supabase.
