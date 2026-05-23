@@ -9,14 +9,17 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardList,
+  Clock3,
   EyeOff,
   HandHeart,
   History,
   Library,
   LogOut,
+  Mail,
   MessageSquareWarning,
   PackageCheck,
   Pencil,
+  Phone,
   Plus,
   RefreshCw,
   Search,
@@ -58,6 +61,7 @@ import type {
 type View = 'dashboard' | 'books' | 'transactions' | 'deliveries' | 'complaints' | 'profile' | 'admin'
 type Notice = { type: 'success' | 'error' | 'info'; text: string } | null
 type AuthMode = 'signin' | 'signup'
+type OwnershipFilter = 'all' | 'available' | 'mine'
 
 type BookForm = {
   title: string
@@ -118,6 +122,12 @@ const pointRule: Record<TransactionType, number> = {
   borrow: 5,
 }
 
+const demoAccounts = [
+  { label: 'Quản trị', email: 'admin@booksharehub.com', password: 'Bookshare123!' },
+  { label: 'Thành viên', email: 'hung@booksharehub.com', password: 'Bookshare123!' },
+  { label: 'Người giao', email: 'lan@booksharehub.com', password: 'Bookshare123!' },
+]
+
 function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [account, setAccount] = useState<Account | null>(null)
@@ -138,6 +148,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all')
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [requestBookId, setRequestBookId] = useState<string | null>(null)
   const [bookForm, setBookForm] = useState<BookForm>(emptyBookForm)
@@ -352,10 +363,14 @@ function App() {
         )
       const matchCategory = categoryFilter === 'all' || book.category === categoryFilter
       const matchStatus = statusFilter === 'all' || book.status === statusFilter
+      const matchOwnership =
+        ownershipFilter === 'all' ||
+        (ownershipFilter === 'available' && book.status === 'available') ||
+        (ownershipFilter === 'mine' && book.owner_account_id === account?.id)
 
-      return isVisible && matchSearch && matchCategory && matchStatus
+      return isVisible && matchSearch && matchCategory && matchStatus && matchOwnership
     })
-  }, [account?.id, books, categoryFilter, searchTerm, statusFilter])
+  }, [account?.id, books, categoryFilter, ownershipFilter, searchTerm, statusFilter])
 
   const myTransactions = useMemo(() => {
     if (!account) {
@@ -476,6 +491,16 @@ function App() {
     setSession(null)
     clearLocalData()
     setActiveView('dashboard')
+  }
+
+  function useDemoAccount(email: string, password: string) {
+    setAuthMode('signin')
+    setAuthForm({
+      full_name: '',
+      phone_number: '',
+      email,
+      password,
+    })
   }
 
   async function handleBookSubmit(event: FormEvent<HTMLFormElement>) {
@@ -754,6 +779,10 @@ function App() {
 
           {notice && <NoticeBanner notice={notice} onClose={() => setNotice(null)} />}
 
+          {authMode === 'signin' && (
+            <DemoAccounts accounts={demoAccounts} onUse={useDemoAccount} />
+          )}
+
           <form className="stack-form" onSubmit={handleAuth}>
             {authMode === 'signup' && (
               <>
@@ -852,6 +881,19 @@ function App() {
             <h1>{pageTitle(activeView)}</h1>
           </div>
           <div className="topbar-actions">
+            {activeView !== 'books' && (
+              <ActionButton
+                type="button"
+                icon={Plus}
+                variant="secondary"
+                onClick={() => {
+                  resetBookForm()
+                  setActiveView('books')
+                }}
+              >
+                Thêm sách
+              </ActionButton>
+            )}
             <div className="score-pill">
               <CircleDollarSign size={18} />
               <span>{account?.points ?? 0} điểm</span>
@@ -893,12 +935,14 @@ function App() {
             searchTerm={searchTerm}
             categoryFilter={categoryFilter}
             statusFilter={statusFilter}
+            ownershipFilter={ownershipFilter}
             bookForm={bookForm}
             editingBookId={editingBookId}
             busyKey={busyKey}
             onSearch={setSearchTerm}
             onCategoryFilter={setCategoryFilter}
             onStatusFilter={setStatusFilter}
+            onOwnershipFilter={setOwnershipFilter}
             onBookFormChange={setBookForm}
             onBookSubmit={handleBookSubmit}
             onResetBookForm={resetBookForm}
@@ -1019,6 +1063,20 @@ function DashboardView({
 }) {
   const ownedBooks = books.filter((book) => book.owner_account_id === account?.id)
   const availableBooks = books.filter((book) => book.status === 'available')
+  const waitingForMe = transactions.filter((transaction) => {
+    if (!account) {
+      return false
+    }
+
+    const isOwner = transaction.owner_account_id === account.id
+    const isBorrower = transaction.borrower_account_id === account.id
+
+    return (
+      (isOwner && transaction.status === 'requested') ||
+      (isOwner && ['accepted', 'borrower_confirmed'].includes(transaction.status) && !transaction.owner_confirmed_at) ||
+      (isBorrower && ['accepted', 'owner_confirmed'].includes(transaction.status) && !transaction.borrower_confirmed_at)
+    )
+  })
 
   return (
     <div className="view-stack">
@@ -1047,6 +1105,32 @@ function DashboardView({
       <div className="two-column">
         <section className="tool-panel">
           <PanelHeader
+            icon={Clock3}
+            title="Cần xử lý"
+            action={
+              <button type="button" className="link-button" onClick={() => setActiveView('transactions')}>
+                Mở giao dịch <ChevronRight size={16} />
+              </button>
+            }
+          />
+          <div className="work-queue">
+            {waitingForMe.slice(0, 4).map((transaction) => (
+              <div className="queue-item" key={transaction.id}>
+                <div>
+                  <strong>{bookMap.get(transaction.book_id)?.title || 'Sách'}</strong>
+                  <span>{getTransactionActionText(transaction, account?.id)}</span>
+                </div>
+                <StatusPill status={transaction.status}>
+                  {transactionStatusLabels[transaction.status]}
+                </StatusPill>
+              </div>
+            ))}
+            {waitingForMe.length === 0 && <EmptyState icon={Clock3} text="Không có việc cần xử lý ngay." />}
+          </div>
+        </section>
+
+        <section className="tool-panel">
+          <PanelHeader
             icon={BookOpen}
             title="Sách đang có sẵn"
             action={
@@ -1060,6 +1144,32 @@ function DashboardView({
               <BookLine key={book.id} book={book} owner={accountMap.get(book.owner_account_id)} />
             ))}
             {availableBooks.length === 0 && <EmptyState icon={BookOpen} text="Chưa có sách khả dụng." />}
+          </div>
+        </section>
+      </div>
+
+      <div className="two-column">
+        <section className="tool-panel">
+          <PanelHeader
+            icon={Truck}
+            title="Đơn giao đang mở"
+            action={
+              <button type="button" className="link-button" onClick={() => setActiveView('deliveries')}>
+                Nhận đơn <ChevronRight size={16} />
+              </button>
+            }
+          />
+          <div className="compact-list">
+            {deliveries.slice(0, 5).map((delivery) => (
+              <div className="list-line" key={delivery.id}>
+                <div>
+                  <strong>{delivery.pickup_location}</strong>
+                  <span>{delivery.dropoff_location}</span>
+                </div>
+                <StatusPill status={delivery.status}>{deliveryStatusLabels[delivery.status]}</StatusPill>
+              </div>
+            ))}
+            {deliveries.length === 0 && <EmptyState icon={Truck} text="Chưa có đơn giao đang mở." />}
           </div>
         </section>
 
@@ -1129,12 +1239,14 @@ function BooksView({
   searchTerm,
   categoryFilter,
   statusFilter,
+  ownershipFilter,
   bookForm,
   editingBookId,
   busyKey,
   onSearch,
   onCategoryFilter,
   onStatusFilter,
+  onOwnershipFilter,
   onBookFormChange,
   onBookSubmit,
   onResetBookForm,
@@ -1149,12 +1261,14 @@ function BooksView({
   searchTerm: string
   categoryFilter: string
   statusFilter: string
+  ownershipFilter: OwnershipFilter
   bookForm: BookForm
   editingBookId: string | null
   busyKey: string | null
   onSearch: (value: string) => void
   onCategoryFilter: (value: string) => void
   onStatusFilter: (value: string) => void
+  onOwnershipFilter: (value: OwnershipFilter) => void
   onBookFormChange: (value: BookForm) => void
   onBookSubmit: (event: FormEvent<HTMLFormElement>) => void
   onResetBookForm: () => void
@@ -1189,6 +1303,27 @@ function BooksView({
             </option>
           ))}
         </select>
+        <div className="filter-pills" aria-label="Lọc nhanh sách">
+          {[
+            ['all', 'Tất cả'],
+            ['available', 'Có sẵn'],
+            ['mine', 'Của tôi'],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={ownershipFilter === value ? 'filter-chip active' : 'filter-chip'}
+              onClick={() => onOwnershipFilter(value as OwnershipFilter)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="quick-summary">
+        <span>{books.length} sách phù hợp</span>
+        <span>{books.filter((book) => book.status === 'available').length} sách có thể yêu cầu ngay</span>
       </section>
 
       <section className="tool-panel">
@@ -1292,6 +1427,16 @@ function BooksView({
                     <dd>{book.publication_year || 'Chưa rõ'}</dd>
                   </div>
                 </dl>
+                <div className="contact-strip">
+                  <span>
+                    <Mail size={14} />
+                    {owner?.email_address || 'Chưa có email'}
+                  </span>
+                  <span>
+                    <Phone size={14} />
+                    {owner?.phone_number || 'Chưa có số điện thoại'}
+                  </span>
+                </div>
                 <div className="card-actions">
                   {isMine && (
                     <ActionButton type="button" icon={Pencil} variant="secondary" onClick={() => onEditBook(book)}>
@@ -1401,6 +1546,10 @@ function TransactionsView({
                     <span>{deliveryStatusLabels[delivery.status]}</span>
                   </div>
                 )}
+                <div className="next-step-note">
+                  <Clock3 size={16} />
+                  <span>{getTransactionActionText(transaction, account?.id)}</span>
+                </div>
               </div>
             </div>
             <div className="entity-actions">
@@ -2098,6 +2247,36 @@ function PanelHeader({
   )
 }
 
+function DemoAccounts({
+  accounts,
+  onUse,
+}: {
+  accounts: typeof demoAccounts
+  onUse: (email: string, password: string) => void
+}) {
+  return (
+    <div className="demo-accounts">
+      <div className="demo-accounts-header">
+        <strong>Tài khoản demo</strong>
+        <span>Mật khẩu: Bookshare123!</span>
+      </div>
+      <div className="demo-account-grid">
+        {accounts.map((account) => (
+          <button
+            key={account.email}
+            type="button"
+            className="demo-account-button"
+            onClick={() => onUse(account.email, account.password)}
+          >
+            <span>{account.label}</span>
+            <strong>{account.email}</strong>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="field">
@@ -2250,6 +2429,41 @@ function formatDate(value: string | null) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+function getTransactionActionText(transaction: BookTransaction, accountId?: string) {
+  const isOwner = transaction.owner_account_id === accountId
+  const isBorrower = transaction.borrower_account_id === accountId
+
+  if (transaction.status === 'requested') {
+    return isOwner ? 'Bạn cần chấp nhận hoặc từ chối yêu cầu.' : 'Đang chờ chủ sách phản hồi.'
+  }
+
+  if (transaction.status === 'accepted') {
+    return 'Hai bên cần xác nhận sau khi giao nhận sách.'
+  }
+
+  if (transaction.status === 'owner_confirmed') {
+    return isBorrower ? 'Bạn cần xác nhận đã nhận sách.' : 'Đang chờ người nhận xác nhận.'
+  }
+
+  if (transaction.status === 'borrower_confirmed') {
+    return isOwner ? 'Bạn cần xác nhận đã giao sách.' : 'Đang chờ chủ sách xác nhận.'
+  }
+
+  if (transaction.status === 'completed' && transaction.transaction_type === 'borrow') {
+    return 'Giao dịch mượn đang hiệu lực, có thể xác nhận trả sách khi hoàn tất.'
+  }
+
+  if (transaction.status === 'completed') {
+    return 'Giao dịch đã hoàn tất và điểm đã được cập nhật.'
+  }
+
+  if (transaction.status === 'returned') {
+    return 'Sách đã được trả và mở lại trong kho.'
+  }
+
+  return 'Không còn hành động bắt buộc.'
 }
 
 function statusTone(status: string) {

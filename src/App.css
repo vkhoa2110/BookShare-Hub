@@ -51,7 +51,7 @@
 
 .auth-panel {
   align-self: center;
-  width: min(480px, calc(100% - 40px));
+  width: min(560px, calc(100% - 40px));
   margin: 0 auto;
   padding: 28px;
   background: var(--panel);
@@ -202,6 +202,8 @@
 .topbar-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
 }
 
@@ -359,7 +361,7 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) 220px 220px;
+  grid-template-columns: minmax(240px, 1fr) 190px 190px 260px;
   gap: 12px;
 }
 
@@ -377,6 +379,49 @@
 .search-box input {
   border: 0;
   padding-inline: 0;
+}
+
+.filter-pills {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-height: 42px;
+  padding: 4px;
+  background: #edf1ee;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.filter-chip {
+  color: var(--muted);
+  font-weight: 700;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.filter-chip.active {
+  color: var(--text);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(18, 26, 23, 0.08);
+}
+
+.quick-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-summary span {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: #355f91;
+  font-size: 13px;
+  font-weight: 800;
+  background: #e8eef6;
+  border: 1px solid #c9d8ea;
+  border-radius: 999px;
 }
 
 .book-form {
@@ -562,6 +607,29 @@ textarea:focus {
   padding: 16px;
 }
 
+.contact-strip {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  background: #f7f9f8;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.contact-strip span,
+.next-step-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.contact-strip span {
+  overflow-wrap: anywhere;
+}
+
 .card-title-row,
 .entity-title-row {
   align-items: flex-start;
@@ -651,6 +719,42 @@ textarea:focus {
   margin-top: 12px;
   color: #355f91;
   font-weight: 700;
+}
+
+.next-step-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  color: #77511f;
+  font-weight: 700;
+  background: #fff7e8;
+  border: 1px solid #ecd6a9;
+  border-radius: 8px;
+}
+
+.work-queue {
+  display: grid;
+  gap: 8px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: #f7f9f8;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.queue-item strong,
+.queue-item span {
+  display: block;
+}
+
+.queue-item span {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .status-pill {
@@ -897,6 +1001,63 @@ td {
   overflow-wrap: anywhere;
 }
 
+.demo-accounts {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f7f9f8;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.demo-accounts-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.demo-accounts-header span {
+  color: var(--muted);
+}
+
+.demo-account-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.demo-account-button {
+  display: grid;
+  gap: 4px;
+  min-height: 62px;
+  padding: 10px;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.demo-account-button:hover {
+  border-color: #24755d;
+}
+
+.demo-account-button span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.demo-account-button strong {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 13px;
+}
+
 .admin-complaint-form {
   justify-content: flex-end;
   align-content: start;
@@ -940,6 +1101,10 @@ td {
   }
 
   .search-box {
+    grid-column: 1 / -1;
+  }
+
+  .filter-pills {
     grid-column: 1 / -1;
   }
 }
@@ -1020,7 +1185,8 @@ td {
   .toolbar,
   .book-grid,
   .book-form,
-  .complaint-form {
+  .complaint-form,
+  .demo-account-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1039,6 +1205,12 @@ td {
   .entity-actions,
   .admin-complaint-form {
     justify-content: flex-start;
+  }
+
+  .queue-item,
+  .demo-accounts-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .meta-grid {
