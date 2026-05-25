@@ -1575,7 +1575,14 @@ function BooksView({
       transaction,
       book: allBooks.find((book) => book.id === transaction.book_id),
     }))
-    .filter((item): item is { transaction: BookTransaction; book: Book } => Boolean(item.book))
+    .filter((item): item is { transaction: BookTransaction; book: Book } => {
+      const book = item.book
+      if (!book) {
+        return false
+      }
+
+      return book.status === 'borrowed'
+    })
   const useCustomPickup = bookForm.address_id === customAddressId || addressOptions.length === 0
 
   return (
@@ -2105,18 +2112,30 @@ function DeliveriesView({
           bookMap={bookMap}
           transactionMap={transactionMap}
           busyKey={busyKey}
-          action={(delivery) =>
-            isVolunteer ? (
+          action={(delivery) => {
+            const transaction = transactionMap.get(delivery.transaction_id)
+            const participantBlockReason = getDeliveryParticipantBlockReason(transaction, account?.id)
+
+            if (!isVolunteer) {
+              return null
+            }
+
+            if (participantBlockReason) {
+              return <span className="inline-warning">{participantBlockReason}</span>
+            }
+
+            return (
               <ActionButton
                 type="button"
                 icon={Check}
+                disabled={!transaction}
                 busy={busyKey === `take-delivery-${delivery.id}`}
                 onClick={() => onTake(delivery.id)}
               >
                 Nhận đơn
               </ActionButton>
-            ) : null
-          }
+            )
+          }}
         />
       </section>
 
@@ -3142,6 +3161,22 @@ function getTransactionActionText(transaction: BookTransaction, accountId?: stri
   }
 
   return 'Không còn hành động bắt buộc.'
+}
+
+function getDeliveryParticipantBlockReason(transaction: BookTransaction | undefined, accountId?: string) {
+  if (!transaction || !accountId) {
+    return null
+  }
+
+  if (transaction.owner_account_id === accountId) {
+    return 'Chủ sách không được nhận đơn giao của giao dịch này.'
+  }
+
+  if (transaction.borrower_account_id === accountId) {
+    return 'Người nhận sách không được nhận đơn giao của giao dịch này.'
+  }
+
+  return null
 }
 
 function statusTone(status: string) {

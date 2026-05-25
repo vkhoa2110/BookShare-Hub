@@ -722,6 +722,24 @@ begin
 end;
 $$;
 
+-- Repair legacy rows where a borrow transaction was returned but the book stayed borrowed.
+update public.books b
+set status = 'available'
+where b.status = 'borrowed'
+  and exists (
+    select 1
+    from public.book_transactions t
+    where t.book_id = b.id
+      and t.transaction_type = 'borrow'
+      and t.status = 'returned'
+  )
+  and not exists (
+    select 1
+    from public.book_transactions t
+    where t.book_id = b.id
+      and t.status in ('requested', 'accepted', 'delivered', 'completed', 'return_requested')
+  );
+
 create or replace function public.register_volunteer()
 returns void
 language plpgsql
@@ -743,6 +761,7 @@ set search_path = public
 as $$
 declare
   v_role text;
+  v_transaction public.book_transactions%rowtype;
 begin
   select role into v_role
   from public.accounts
@@ -751,6 +770,19 @@ begin
 
   if v_role not in ('volunteer', 'admin') then
     raise exception 'Bạn cần đăng ký làm người giao sách';
+  end if;
+
+  select t.* into v_transaction
+  from public.deliveries d
+  join public.book_transactions t on t.id = d.transaction_id
+  where d.id = p_delivery_id;
+
+  if not found then
+    raise exception 'Không tìm thấy đơn giao';
+  end if;
+
+  if auth.uid() in (v_transaction.owner_account_id, v_transaction.borrower_account_id) then
+    raise exception 'Người cho mượn hoặc người nhận sách không được nhận đơn giao của chính giao dịch này';
   end if;
 
   update public.deliveries
@@ -778,6 +810,7 @@ set search_path = public
 as $$
 declare
   v_delivery public.deliveries%rowtype;
+  v_transaction public.book_transactions%rowtype;
 begin
   if p_status not in ('in_transit', 'delivered') then
     raise exception 'Trạng thái giao sách không hợp lệ';
@@ -794,6 +827,14 @@ begin
 
   if v_delivery.volunteer_account_id <> auth.uid() then
     raise exception 'Chỉ người nhận giao được cập nhật đơn này';
+  end if;
+
+  select * into v_transaction
+  from public.book_transactions
+  where id = v_delivery.transaction_id;
+
+  if found and auth.uid() in (v_transaction.owner_account_id, v_transaction.borrower_account_id) then
+    raise exception 'Người trong giao dịch không được cập nhật đơn giao của chính giao dịch này';
   end if;
 
   if p_status = 'in_transit' and v_delivery.status <> 'accepted' then

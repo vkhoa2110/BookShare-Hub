@@ -933,6 +933,19 @@ textarea:focus {
   font-weight: 700;
 }
 
+.inline-warning {
+  display: inline-flex;
+  max-width: 220px;
+  padding: 9px 10px;
+  color: #77511f;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  background: #fff7e8;
+  border: 1px solid #ecd6a9;
+  border-radius: 8px;
+}
+
 .delivery-stack {
   display: flex;
   flex-wrap: wrap;
