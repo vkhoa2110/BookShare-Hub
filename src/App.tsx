@@ -13,6 +13,8 @@ import {
   EyeOff,
   HandHeart,
   History,
+  Home,
+  ImagePlus,
   Library,
   LogOut,
   Mail,
@@ -25,7 +27,9 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Trash2,
   Truck,
+  Upload,
   UserRound,
   UserRoundPlus,
   X,
@@ -46,6 +50,7 @@ import {
 import { supabase } from './lib/supabase'
 import type {
   Account,
+  AccountAddress,
   Book,
   BookCondition,
   BookStatus,
@@ -65,25 +70,36 @@ type Notice = { type: 'success' | 'error' | 'info'; text: string } | null
 type AuthMode = 'signin' | 'signup'
 type OwnershipFilter = 'all' | 'available' | 'mine'
 
+type AddressForm = {
+  label: string
+  address_text: string
+  is_default: boolean
+}
+
 type BookForm = {
   title: string
   category: string
   author: string
   publication_year: string
   condition: BookCondition
+  address_id: string
   pickup_location: string
+  cover_image_url: string | null
+  cover_file: File | null
 }
 
 type RequestForm = {
   transaction_type: TransactionType
   delivery_method: DeliveryMethod
   return_due_at: string
+  address_id: string
   pickup_location: string
   dropoff_location: string
 }
 
 type ReturnForm = {
   delivery_method: DeliveryMethod
+  address_id: string
   pickup_location: string
   dropoff_location: string
 }
@@ -100,21 +116,32 @@ const emptyBookForm: BookForm = {
   author: '',
   publication_year: '',
   condition: 'good',
+  address_id: 'custom',
   pickup_location: '',
+  cover_image_url: null,
+  cover_file: null,
 }
 
 const emptyRequestForm: RequestForm = {
   transaction_type: 'exchange',
   delivery_method: 'self_pickup',
   return_due_at: '',
+  address_id: 'custom',
   pickup_location: '',
   dropoff_location: '',
 }
 
 const emptyReturnForm: ReturnForm = {
   delivery_method: 'self_pickup',
+  address_id: 'custom',
   pickup_location: '',
   dropoff_location: '',
+}
+
+const emptyAddressForm: AddressForm = {
+  label: '',
+  address_text: '',
+  is_default: false,
 }
 
 const emptyComplaintForm: ComplaintForm = {
@@ -144,10 +171,52 @@ const demoAccounts = [
   { label: 'Người giao', email: 'lan@booksharehub.com', password: 'Bookshare123!' },
 ]
 
+const customAddressId = 'custom'
+const bookCoverBucket = 'book-covers'
+
+function defaultAddress(addresses: AccountAddress[]) {
+  return addresses.find((address) => address.is_default) || addresses[0] || null
+}
+
+function addressIdForValue(addresses: AccountAddress[], value: string) {
+  return addresses.find((address) => address.address_text === value)?.id || customAddressId
+}
+
+function createBookForm(addresses: AccountAddress[] = []): BookForm {
+  const address = defaultAddress(addresses)
+
+  return {
+    ...emptyBookForm,
+    address_id: address?.id || customAddressId,
+    pickup_location: address?.address_text || '',
+  }
+}
+
+function createRequestForm(addresses: AccountAddress[] = []): RequestForm {
+  const address = defaultAddress(addresses)
+
+  return {
+    ...emptyRequestForm,
+    address_id: address?.id || customAddressId,
+    dropoff_location: address?.address_text || '',
+  }
+}
+
+function createReturnForm(addresses: AccountAddress[] = []): ReturnForm {
+  const address = defaultAddress(addresses)
+
+  return {
+    ...emptyReturnForm,
+    address_id: address?.id || customAddressId,
+    pickup_location: address?.address_text || '',
+  }
+}
+
 function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [account, setAccount] = useState<Account | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [accountAddresses, setAccountAddresses] = useState<AccountAddress[]>([])
   const [books, setBooks] = useState<Book[]>([])
   const [transactions, setTransactions] = useState<BookTransaction[]>([])
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
@@ -168,10 +237,12 @@ function App() {
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [requestBookId, setRequestBookId] = useState<string | null>(null)
   const [returnTransactionId, setReturnTransactionId] = useState<string | null>(null)
-  const [bookForm, setBookForm] = useState<BookForm>(emptyBookForm)
-  const [requestForm, setRequestForm] = useState<RequestForm>(emptyRequestForm)
-  const [returnForm, setReturnForm] = useState<ReturnForm>(emptyReturnForm)
+  const [bookForm, setBookForm] = useState<BookForm>(() => createBookForm())
+  const [requestForm, setRequestForm] = useState<RequestForm>(() => createRequestForm())
+  const [returnForm, setReturnForm] = useState<ReturnForm>(() => createReturnForm())
   const [complaintForm, setComplaintForm] = useState<ComplaintForm>(emptyComplaintForm)
+  const [addressForm, setAddressForm] = useState<AddressForm>(emptyAddressForm)
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
   const [profileForm, setProfileForm] = useState({ full_name: '', phone_number: '' })
   const [authForm, setAuthForm] = useState({
     full_name: '',
@@ -233,6 +304,7 @@ function App() {
       const [
         accountResult,
         accountsResult,
+        addressesResult,
         booksResult,
         transactionsResult,
         deliveriesResult,
@@ -242,6 +314,12 @@ function App() {
       ] = await Promise.all([
         supabase.from('accounts').select('*').eq('id', userId).single(),
         supabase.from('accounts').select('*').order('full_name', { ascending: true }),
+        supabase
+          .from('account_addresses')
+          .select('*')
+          .eq('account_id', userId)
+          .order('is_default', { ascending: false })
+          .order('created_at', { ascending: true }),
         supabase.from('books').select('*').order('created_at', { ascending: false }),
         supabase.from('book_transactions').select('*').order('created_at', { ascending: false }),
         supabase.from('deliveries').select('*').order('created_at', { ascending: false }),
@@ -253,6 +331,7 @@ function App() {
       const results = [
         accountResult,
         accountsResult,
+        addressesResult,
         booksResult,
         transactionsResult,
         deliveriesResult,
@@ -273,6 +352,7 @@ function App() {
         phone_number: ((accountResult.data as Account).phone_number as string | null) || '',
       })
       setAccounts((accountsResult.data || []) as Account[])
+      setAccountAddresses((addressesResult.data || []) as AccountAddress[])
       setBooks((booksResult.data || []) as Book[])
       setTransactions((transactionsResult.data || []) as BookTransaction[])
       setDeliveries((deliveriesResult.data || []) as Delivery[])
@@ -441,6 +521,7 @@ function App() {
   function clearLocalData() {
     setAccount(null)
     setAccounts([])
+    setAccountAddresses([])
     setBooks([])
     setTransactions([])
     setDeliveries([])
@@ -532,6 +613,31 @@ function App() {
     })
   }
 
+  async function uploadBookCover(file: File) {
+    if (!account) {
+      throw new Error('Bạn cần đăng nhập để tải ảnh.')
+    }
+
+    if (!file.type.startsWith('image/')) {
+      throw new Error('File ảnh không hợp lệ.')
+    }
+
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const safeName = `${Date.now()}-${crypto.randomUUID()}.${extension}`
+    const path = `${account.id}/${safeName}`
+    const { error } = await supabase.storage.from(bookCoverBucket).upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    const { data } = supabase.storage.from(bookCoverBucket).getPublicUrl(path)
+    return data.publicUrl
+  }
+
   async function handleBookSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -539,20 +645,28 @@ function App() {
       return
     }
 
-    const payload = {
-      owner_account_id: account.id,
-      title: bookForm.title.trim(),
-      category: bookForm.category.trim(),
-      author: bookForm.author.trim(),
-      publication_year: bookForm.publication_year ? Number(bookForm.publication_year) : null,
-      condition: bookForm.condition,
-      pickup_location: bookForm.pickup_location.trim(),
-    }
-
     await runAction(
       editingBookId ? 'book-update' : 'book-create',
       editingBookId ? 'Đã cập nhật sách.' : 'Đã thêm sách vào kho.',
       async () => {
+        if (!bookForm.pickup_location.trim()) {
+          throw new Error('Cần chọn hoặc nhập địa chỉ nhận sách.')
+        }
+
+        const coverImageUrl = bookForm.cover_file
+          ? await uploadBookCover(bookForm.cover_file)
+          : bookForm.cover_image_url
+        const payload = {
+          owner_account_id: account.id,
+          title: bookForm.title.trim(),
+          category: bookForm.category.trim(),
+          author: bookForm.author.trim(),
+          publication_year: bookForm.publication_year ? Number(bookForm.publication_year) : null,
+          condition: bookForm.condition,
+          pickup_location: bookForm.pickup_location.trim(),
+          cover_image_url: coverImageUrl || null,
+        }
+
         const response = editingBookId
           ? await supabase.from('books').update(payload).eq('id', editingBookId)
           : await supabase.from('books').insert(payload)
@@ -574,14 +688,17 @@ function App() {
       author: book.author,
       publication_year: book.publication_year ? String(book.publication_year) : '',
       condition: book.condition,
+      address_id: addressIdForValue(accountAddresses, book.pickup_location || ''),
       pickup_location: book.pickup_location || '',
+      cover_image_url: book.cover_image_url || null,
+      cover_file: null,
     })
     setActiveView('books')
   }
 
   function resetBookForm() {
     setEditingBookId(null)
-    setBookForm(emptyBookForm)
+    setBookForm(createBookForm(accountAddresses))
   }
 
   async function updateBookStatus(bookId: string, status: BookStatus) {
@@ -765,6 +882,83 @@ function App() {
           phone_number: profileForm.phone_number.trim() || null,
         })
         .eq('id', account.id)
+
+      if (error) {
+        throw error
+      }
+    })
+  }
+
+  function startEditAddress(address: AccountAddress) {
+    setEditingAddressId(address.id)
+    setAddressForm({
+      label: address.label,
+      address_text: address.address_text,
+      is_default: address.is_default,
+    })
+  }
+
+  function resetAddressForm() {
+    setEditingAddressId(null)
+    setAddressForm(emptyAddressForm)
+  }
+
+  async function submitAddress(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!account) {
+      return
+    }
+
+    await runAction(
+      editingAddressId ? 'address-update' : 'address-create',
+      editingAddressId ? 'Đã cập nhật địa chỉ.' : 'Đã thêm địa chỉ.',
+      async () => {
+        if (!addressForm.address_text.trim()) {
+          throw new Error('Địa chỉ không được để trống.')
+        }
+
+        if (addressForm.is_default) {
+          const { error: resetError } = await supabase
+            .from('account_addresses')
+            .update({ is_default: false })
+            .eq('account_id', account.id)
+
+          if (resetError) {
+            throw resetError
+          }
+        }
+
+        const payload = {
+          account_id: account.id,
+          label: addressForm.label.trim() || 'Địa chỉ',
+          address_text: addressForm.address_text.trim(),
+          is_default: addressForm.is_default,
+        }
+        const response = editingAddressId
+          ? await supabase.from('account_addresses').update(payload).eq('id', editingAddressId)
+          : await supabase.from('account_addresses').insert(payload)
+
+        if (response.error) {
+          throw response.error
+        }
+
+        resetAddressForm()
+      },
+    )
+  }
+
+  async function deleteAddress(addressId: string) {
+    if (!account) {
+      return
+    }
+
+    await runAction(`address-delete-${addressId}`, 'Đã xóa địa chỉ.', async () => {
+      const { error } = await supabase
+        .from('account_addresses')
+        .delete()
+        .eq('id', addressId)
+        .eq('account_id', account.id)
 
       if (error) {
         throw error
@@ -986,6 +1180,9 @@ function App() {
             account={account}
             accountMap={accountMap}
             books={filteredBooks}
+            allBooks={books}
+            transactions={myTransactions}
+            addressOptions={accountAddresses}
             categories={categories}
             searchTerm={searchTerm}
             categoryFilter={categoryFilter}
@@ -1005,7 +1202,7 @@ function App() {
             onHideBook={(book) => updateBookStatus(book.id, book.status === 'hidden' ? 'available' : 'hidden')}
             onRequestBook={(book) => {
               setRequestBookId(book.id)
-              setRequestForm(emptyRequestForm)
+              setRequestForm(createRequestForm(accountAddresses))
             }}
           />
         )}
@@ -1023,7 +1220,7 @@ function App() {
             onConfirm={(transaction) => confirmTransaction(transaction.id)}
             onRequestReturn={(transaction) => {
               setReturnTransactionId(transaction.id)
-              setReturnForm(emptyReturnForm)
+              setReturnForm(createReturnForm(accountAddresses))
             }}
             onConfirmReturn={(transaction) => markReturned(transaction.id)}
           />
@@ -1062,12 +1259,20 @@ function App() {
           <ProfileView
             account={account}
             form={profileForm}
+            addresses={accountAddresses}
+            addressForm={addressForm}
+            editingAddressId={editingAddressId}
             ledger={ledger}
             history={history}
             accountMap={accountMap}
             busyKey={busyKey}
             onFormChange={setProfileForm}
             onSubmit={updateProfile}
+            onAddressFormChange={setAddressForm}
+            onAddressSubmit={submitAddress}
+            onEditAddress={startEditAddress}
+            onDeleteAddress={deleteAddress}
+            onResetAddressForm={resetAddressForm}
           />
         )}
 
@@ -1090,6 +1295,7 @@ function App() {
           account={account}
           book={selectedRequestBook}
           owner={accountMap.get(selectedRequestBook.owner_account_id)}
+          addresses={accountAddresses}
           form={requestForm}
           busy={busyKey === 'request-create'}
           onFormChange={setRequestForm}
@@ -1104,6 +1310,7 @@ function App() {
           book={bookMap.get(selectedReturnTransaction.book_id)}
           owner={accountMap.get(selectedReturnTransaction.owner_account_id)}
           borrower={accountMap.get(selectedReturnTransaction.borrower_account_id)}
+          addresses={accountAddresses}
           form={returnForm}
           busy={busyKey === 'return-request'}
           onFormChange={setReturnForm}
@@ -1309,6 +1516,9 @@ function BooksView({
   account,
   accountMap,
   books,
+  allBooks,
+  transactions,
+  addressOptions,
   categories,
   searchTerm,
   categoryFilter,
@@ -1331,6 +1541,9 @@ function BooksView({
   account: Account | null
   accountMap: Map<string, Account>
   books: Book[]
+  allBooks: Book[]
+  transactions: BookTransaction[]
+  addressOptions: AccountAddress[]
   categories: string[]
   searchTerm: string
   categoryFilter: string
@@ -1350,6 +1563,21 @@ function BooksView({
   onHideBook: (book: Book) => void
   onRequestBook: (book: Book) => void
 }) {
+  const ownedBooks = allBooks.filter((book) => book.owner_account_id === account?.id)
+  const borrowedBooks = transactions
+    .filter(
+      (transaction) =>
+        transaction.borrower_account_id === account?.id &&
+        transaction.transaction_type === 'borrow' &&
+        ['completed', 'return_requested'].includes(transaction.status),
+    )
+    .map((transaction) => ({
+      transaction,
+      book: allBooks.find((book) => book.id === transaction.book_id),
+    }))
+    .filter((item): item is { transaction: BookTransaction; book: Book } => Boolean(item.book))
+  const useCustomPickup = bookForm.address_id === customAddressId || addressOptions.length === 0
+
   return (
     <div className="view-stack">
       <section className="toolbar">
@@ -1400,79 +1628,153 @@ function BooksView({
         <span>{books.filter((book) => book.status === 'available').length} sách có thể yêu cầu ngay</span>
       </section>
 
-      <section className="tool-panel">
+      <section className="tool-panel book-uploader">
         <PanelHeader icon={editingBookId ? Pencil : Plus} title={editingBookId ? 'Sửa sách' : 'Thêm sách'} />
-        <form className="book-form" onSubmit={onBookSubmit}>
-          <Field label="Tên sách">
+        <form className="book-form redesigned" onSubmit={onBookSubmit}>
+          <label className="cover-picker">
             <input
-              required
-              value={bookForm.title}
-              onChange={(event) => onBookFormChange({ ...bookForm, title: event.target.value })}
-              placeholder="Tên sách"
-            />
-          </Field>
-          <Field label="Thể loại">
-            <input
-              required
-              value={bookForm.category}
-              onChange={(event) => onBookFormChange({ ...bookForm, category: event.target.value })}
-              placeholder="Kỹ năng, văn học..."
-            />
-          </Field>
-          <Field label="Tác giả">
-            <input
-              required
-              value={bookForm.author}
-              onChange={(event) => onBookFormChange({ ...bookForm, author: event.target.value })}
-              placeholder="Tên tác giả"
-            />
-          </Field>
-          <Field label="Năm xuất bản">
-            <input
-              type="number"
-              min="1000"
-              max="2100"
-              value={bookForm.publication_year}
-              onChange={(event) => onBookFormChange({ ...bookForm, publication_year: event.target.value })}
-              placeholder="2024"
-            />
-          </Field>
-          <Field label="Tình trạng">
-            <select
-              value={bookForm.condition}
+              type="file"
+              accept="image/*"
               onChange={(event) =>
-                onBookFormChange({ ...bookForm, condition: event.target.value as BookCondition })
+                onBookFormChange({ ...bookForm, cover_file: event.target.files?.[0] || null })
               }
-            >
-              {(Object.keys(conditionLabels) as BookCondition[]).map((condition) => (
-                <option key={condition} value={condition}>
-                  {conditionLabels[condition]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Địa điểm sách">
-            <input
-              required
-              value={bookForm.pickup_location}
-              onChange={(event) => onBookFormChange({ ...bookForm, pickup_location: event.target.value })}
-              placeholder="CLB sách, tòa nhà, khu vực"
             />
-          </Field>
-          <div className="form-actions">
-            <ActionButton
-              icon={editingBookId ? Check : Plus}
-              busy={busyKey === 'book-create' || busyKey === 'book-update'}
-            >
-              {editingBookId ? 'Lưu sách' : 'Thêm sách'}
-            </ActionButton>
-            {editingBookId && (
-              <ActionButton type="button" icon={X} variant="secondary" onClick={onResetBookForm}>
-                Hủy
-              </ActionButton>
+            <div className="cover-preview">
+              {bookForm.cover_image_url ? (
+                <img src={bookForm.cover_image_url} alt="" />
+              ) : (
+                <ImagePlus size={34} />
+              )}
+            </div>
+            <span>
+              <Upload size={15} />
+              {bookForm.cover_file?.name || 'Ảnh minh họa'}
+            </span>
+          </label>
+
+          <div className="book-form-fields">
+            <Field label="Tên sách">
+              <input
+                required
+                value={bookForm.title}
+                onChange={(event) => onBookFormChange({ ...bookForm, title: event.target.value })}
+                placeholder="Tên sách"
+              />
+            </Field>
+            <Field label="Thể loại">
+              <input
+                required
+                value={bookForm.category}
+                onChange={(event) => onBookFormChange({ ...bookForm, category: event.target.value })}
+                placeholder="Kỹ năng, văn học..."
+              />
+            </Field>
+            <Field label="Tác giả">
+              <input
+                required
+                value={bookForm.author}
+                onChange={(event) => onBookFormChange({ ...bookForm, author: event.target.value })}
+                placeholder="Tên tác giả"
+              />
+            </Field>
+            <Field label="Năm xuất bản">
+              <input
+                type="number"
+                min="1000"
+                max="2100"
+                value={bookForm.publication_year}
+                onChange={(event) => onBookFormChange({ ...bookForm, publication_year: event.target.value })}
+                placeholder="2024"
+              />
+            </Field>
+            <Field label="Tình trạng">
+              <select
+                value={bookForm.condition}
+                onChange={(event) =>
+                  onBookFormChange({ ...bookForm, condition: event.target.value as BookCondition })
+                }
+              >
+                {(Object.keys(conditionLabels) as BookCondition[]).map((condition) => (
+                  <option key={condition} value={condition}>
+                    {conditionLabels[condition]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Địa chỉ nhận sách">
+              <select
+                value={bookForm.address_id}
+                onChange={(event) => {
+                  const addressId = event.target.value
+                  const address = addressOptions.find((item) => item.id === addressId)
+                  onBookFormChange({
+                    ...bookForm,
+                    address_id: addressId,
+                    pickup_location: address?.address_text || '',
+                  })
+                }}
+              >
+                {addressOptions.map((address) => (
+                  <option key={address.id} value={address.id}>
+                    {address.label}
+                  </option>
+                ))}
+                <option value={customAddressId}>Địa chỉ khác</option>
+              </select>
+            </Field>
+            {useCustomPickup && (
+              <Field label="Nhập địa chỉ">
+                <input
+                  required
+                  value={bookForm.pickup_location}
+                  onChange={(event) => onBookFormChange({ ...bookForm, pickup_location: event.target.value })}
+                  placeholder="CLB sách, tòa nhà, khu vực"
+                />
+              </Field>
             )}
+            <div className="form-actions">
+              <ActionButton
+                icon={editingBookId ? Check : Plus}
+                busy={busyKey === 'book-create' || busyKey === 'book-update'}
+              >
+                {editingBookId ? 'Lưu sách' : 'Thêm sách'}
+              </ActionButton>
+              {editingBookId && (
+                <ActionButton type="button" icon={X} variant="secondary" onClick={onResetBookForm}>
+                  Hủy
+                </ActionButton>
+              )}
+            </div>
           </div>
         </form>
+      </section>
+
+      <section className="tool-panel">
+        <PanelHeader icon={Library} title="Sách của tôi" />
+        <div className="my-books-board">
+          <div>
+            <h3>Đã đăng</h3>
+            <div className="mini-book-list">
+              {ownedBooks.slice(0, 6).map((book) => (
+                <MiniBookItem key={book.id} book={book} detail={bookStatusLabels[book.status]} />
+              ))}
+              {ownedBooks.length === 0 && <EmptyState icon={BookOpen} text="Chưa đăng sách." />}
+            </div>
+          </div>
+          <div>
+            <h3>Đang mượn</h3>
+            <div className="mini-book-list">
+              {borrowedBooks.slice(0, 6).map(({ book, transaction }) => (
+                <MiniBookItem
+                  key={transaction.id}
+                  book={book}
+                  detail={transaction.status === 'return_requested' ? 'Đang trả sách' : 'Đang mượn'}
+                />
+              ))}
+              {borrowedBooks.length === 0 && <EmptyState icon={BookOpen} text="Chưa có sách đang mượn." />}
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="book-grid">
@@ -1483,10 +1785,7 @@ function BooksView({
 
           return (
             <article className="book-card" key={book.id}>
-              <div className={`book-cover condition-${book.condition}`}>
-                <BookOpen size={28} />
-                <span>{book.category.slice(0, 22)}</span>
-              </div>
+              <BookCover book={book} />
               <div className="book-card-body">
                 <div className="card-title-row">
                   <div>
@@ -1550,6 +1849,33 @@ function BooksView({
         })}
         {books.length === 0 && <EmptyState icon={BookOpen} text="Không có sách phù hợp." />}
       </section>
+    </div>
+  )
+}
+
+function MiniBookItem({ book, detail }: { book: Book; detail: string }) {
+  return (
+    <div className="mini-book-item">
+      <BookCover book={book} size="small" />
+      <div>
+        <strong>{book.title}</strong>
+        <span>{detail}</span>
+      </div>
+    </div>
+  )
+}
+
+function BookCover({ book, size = 'default' }: { book: Book; size?: 'default' | 'small' }) {
+  return (
+    <div className={`book-cover condition-${book.condition} ${size === 'small' ? 'small' : ''} ${book.cover_image_url ? 'with-image' : ''}`}>
+      {book.cover_image_url ? (
+        <img src={book.cover_image_url} alt="" />
+      ) : (
+        <>
+          <BookOpen size={size === 'small' ? 20 : 28} />
+          <span>{book.category.slice(0, 22)}</span>
+        </>
+      )}
     </div>
   )
 }
@@ -2023,21 +2349,37 @@ function ComplaintsView({
 function ProfileView({
   account,
   form,
+  addresses,
+  addressForm,
+  editingAddressId,
   ledger,
   history,
   accountMap,
   busyKey,
   onFormChange,
   onSubmit,
+  onAddressFormChange,
+  onAddressSubmit,
+  onEditAddress,
+  onDeleteAddress,
+  onResetAddressForm,
 }: {
   account: Account | null
   form: { full_name: string; phone_number: string }
+  addresses: AccountAddress[]
+  addressForm: AddressForm
+  editingAddressId: string | null
   ledger: PointLedger[]
   history: TransactionHistory[]
   accountMap: Map<string, Account>
   busyKey: string | null
   onFormChange: (form: { full_name: string; phone_number: string }) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onAddressFormChange: (form: AddressForm) => void
+  onAddressSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onEditAddress: (address: AccountAddress) => void
+  onDeleteAddress: (addressId: string) => void
+  onResetAddressForm: () => void
 }) {
   return (
     <div className="two-column align-start">
@@ -2066,6 +2408,71 @@ function ProfileView({
             Lưu hồ sơ
           </ActionButton>
         </form>
+      </section>
+
+      <section className="tool-panel">
+        <PanelHeader icon={Home} title="Địa chỉ nhận sách" />
+        <form className="stack-form" onSubmit={onAddressSubmit}>
+          <Field label="Tên địa chỉ">
+            <input
+              required
+              value={addressForm.label}
+              onChange={(event) => onAddressFormChange({ ...addressForm, label: event.target.value })}
+              placeholder="Nhà, trường, CLB..."
+            />
+          </Field>
+          <Field label="Địa chỉ">
+            <textarea
+              required
+              rows={3}
+              value={addressForm.address_text}
+              onChange={(event) => onAddressFormChange({ ...addressForm, address_text: event.target.value })}
+              placeholder="Tòa nhà, phòng, khu vực"
+            />
+          </Field>
+          <label className="check-line">
+            <input
+              type="checkbox"
+              checked={addressForm.is_default}
+              onChange={(event) => onAddressFormChange({ ...addressForm, is_default: event.target.checked })}
+            />
+            <span>Đặt làm mặc định</span>
+          </label>
+          <div className="form-actions">
+            <ActionButton icon={editingAddressId ? Check : Plus} busy={busyKey === 'address-create' || busyKey === 'address-update'}>
+              {editingAddressId ? 'Lưu địa chỉ' : 'Thêm địa chỉ'}
+            </ActionButton>
+            {editingAddressId && (
+              <ActionButton type="button" icon={X} variant="secondary" onClick={onResetAddressForm}>
+                Hủy
+              </ActionButton>
+            )}
+          </div>
+        </form>
+        <div className="address-list">
+          {addresses.map((address) => (
+            <div className="address-item" key={address.id}>
+              <div>
+                <strong>{address.label}</strong>
+                <span>{address.address_text}</span>
+              </div>
+              {address.is_default && <StatusPill status="completed">Mặc định</StatusPill>}
+              <div className="address-actions">
+                <IconOnlyButton label="Sửa địa chỉ" onClick={() => onEditAddress(address)}>
+                  <Pencil size={16} />
+                </IconOnlyButton>
+                <IconOnlyButton
+                  label="Xóa địa chỉ"
+                  busy={busyKey === `address-delete-${address.id}`}
+                  onClick={() => onDeleteAddress(address.id)}
+                >
+                  <Trash2 size={16} />
+                </IconOnlyButton>
+              </div>
+            </div>
+          ))}
+          {addresses.length === 0 && <EmptyState icon={MapPin} text="Chưa có địa chỉ." />}
+        </div>
       </section>
 
       <section className="tool-panel">
@@ -2262,6 +2669,7 @@ function RequestDialog({
   account,
   book,
   owner,
+  addresses,
   form,
   busy,
   onFormChange,
@@ -2271,6 +2679,7 @@ function RequestDialog({
   account: Account | null
   book: Book
   owner?: Account
+  addresses: AccountAddress[]
   form: RequestForm
   busy: boolean
   onFormChange: (form: RequestForm) => void
@@ -2279,6 +2688,7 @@ function RequestDialog({
 }) {
   const requiredPoints = pointRule[form.transaction_type]
   const hasEnoughPoints = (account?.points || 0) >= requiredPoints
+  const useCustomAddress = form.address_id === customAddressId || addresses.length === 0
 
   return (
     <div className="dialog-backdrop" role="presentation">
@@ -2331,17 +2741,40 @@ function RequestDialog({
             <span>Địa điểm lấy sách từ chủ sở hữu: {book.pickup_location || 'Chưa cập nhật'}</span>
           </div>
           <Field label="Địa chỉ/điểm hẹn nhận sách">
-            <input
-              required
-              value={form.dropoff_location}
-              onChange={(event) => onFormChange({ ...form, dropoff_location: event.target.value })}
-              placeholder={
-                form.delivery_method === 'volunteer'
-                  ? 'Nơi người giao sách mang sách tới'
-                  : 'Nơi hai bên tự gặp để nhận sách'
-              }
-            />
+            <select
+              value={form.address_id}
+              onChange={(event) => {
+                const addressId = event.target.value
+                const address = addresses.find((item) => item.id === addressId)
+                onFormChange({
+                  ...form,
+                  address_id: addressId,
+                  dropoff_location: address?.address_text || '',
+                })
+              }}
+            >
+              {addresses.map((address) => (
+                <option key={address.id} value={address.id}>
+                  {address.label}
+                </option>
+              ))}
+              <option value={customAddressId}>Địa chỉ khác</option>
+            </select>
           </Field>
+          {useCustomAddress && (
+            <Field label="Nhập địa chỉ">
+              <input
+                required
+                value={form.dropoff_location}
+                onChange={(event) => onFormChange({ ...form, dropoff_location: event.target.value })}
+                placeholder={
+                  form.delivery_method === 'volunteer'
+                    ? 'Nơi người giao sách mang sách tới'
+                    : 'Nơi hai bên tự gặp để nhận sách'
+                }
+              />
+            </Field>
+          )}
           <div className="point-check">
             <CircleDollarSign size={18} />
             <span>
@@ -2362,6 +2795,7 @@ function ReturnDialog({
   book,
   owner,
   borrower,
+  addresses,
   form,
   busy,
   onFormChange,
@@ -2372,12 +2806,15 @@ function ReturnDialog({
   book?: Book
   owner?: Account
   borrower?: Account
+  addresses: AccountAddress[]
   form: ReturnForm
   busy: boolean
   onFormChange: (form: ReturnForm) => void
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
+  const useCustomAddress = form.address_id === customAddressId || addresses.length === 0
+
   return (
     <div className="dialog-backdrop" role="presentation">
       <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="return-title">
@@ -2407,14 +2844,39 @@ function ReturnDialog({
             </select>
           </Field>
           {form.delivery_method === 'volunteer' && (
-            <Field label="Địa chỉ lấy sách trả">
-              <input
-                required
-                value={form.pickup_location}
-                onChange={(event) => onFormChange({ ...form, pickup_location: event.target.value })}
-                placeholder="Nơi người giao sách lấy sách từ người mượn"
-              />
-            </Field>
+            <>
+              <Field label="Địa chỉ lấy sách trả">
+                <select
+                  value={form.address_id}
+                  onChange={(event) => {
+                    const addressId = event.target.value
+                    const address = addresses.find((item) => item.id === addressId)
+                    onFormChange({
+                      ...form,
+                      address_id: addressId,
+                      pickup_location: address?.address_text || '',
+                    })
+                  }}
+                >
+                  {addresses.map((address) => (
+                    <option key={address.id} value={address.id}>
+                      {address.label}
+                    </option>
+                  ))}
+                  <option value={customAddressId}>Địa chỉ khác</option>
+                </select>
+              </Field>
+              {useCustomAddress && (
+                <Field label="Nhập địa chỉ">
+                  <input
+                    required
+                    value={form.pickup_location}
+                    onChange={(event) => onFormChange({ ...form, pickup_location: event.target.value })}
+                    placeholder="Nơi người giao sách lấy sách từ người mượn"
+                  />
+                </Field>
+              )}
+            </>
           )}
           <div className="dialog-note">
             <MapPin size={16} />

@@ -65,16 +65,28 @@ const users = [
   },
 ]
 
+const accountAddresses = [
+  ['80000000-0000-4000-8000-000000000001', users[0].id, 'Văn phòng khoa', 'Văn phòng khoa CNTT', true],
+  ['80000000-0000-4000-8000-000000000002', users[1].id, 'Sảnh nhà A', 'Sảnh nhà A', true],
+  ['80000000-0000-4000-8000-000000000003', users[1].id, 'Tủ sách CLB', 'Tủ sách CLB - tầng 2 thư viện', false],
+  ['80000000-0000-4000-8000-000000000004', users[2].id, 'CLB sách', 'Phòng CLB sách', true],
+  ['80000000-0000-4000-8000-000000000005', users[2].id, 'Thư viện', 'Tủ sách CLB - tầng 2 thư viện', false],
+  ['80000000-0000-4000-8000-000000000006', users[3].id, 'Phòng lab', 'Phòng lab 302', true],
+  ['80000000-0000-4000-8000-000000000007', users[3].id, 'Sân nhà C', 'Sân sau nhà C', false],
+  ['80000000-0000-4000-8000-000000000008', users[4].id, 'Quầy tình nguyện', 'Quầy sinh viên tình nguyện', true],
+  ['80000000-0000-4000-8000-000000000009', users[5].id, 'Ký túc xá', 'Ký túc xá B1', true],
+]
+
 const books = [
-  ['20000000-0000-4000-8000-000000000001', users[2].id, 'Đắc Nhân Tâm', 'Kỹ năng', 'Dale Carnegie', 2021, 'good', 'negotiating', 'Tủ sách CLB - tầng 2 thư viện'],
-  ['20000000-0000-4000-8000-000000000002', users[1].id, 'Nhà Giả Kim', 'Tiểu thuyết', 'Paulo Coelho', 2020, 'used', 'borrowed', 'Sảnh nhà A'],
-  ['20000000-0000-4000-8000-000000000003', users[3].id, 'Clean Code', 'Lập trình', 'Robert C. Martin', 2019, 'good', 'available', 'Phòng lab 302'],
-  ['20000000-0000-4000-8000-000000000004', users[4].id, 'Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Truyền cảm hứng', 'Rosie Nguyễn', 2022, 'new', 'available', 'Quầy sinh viên tình nguyện'],
-  ['20000000-0000-4000-8000-000000000005', users[5].id, 'Atomic Habits', 'Kỹ năng', 'James Clear', 2023, 'good', 'negotiating', 'Ký túc xá B1'],
-  ['20000000-0000-4000-8000-000000000006', users[2].id, 'SQL for Data Analysis', 'Dữ liệu', 'Cathy Tanimura', 2021, 'used', 'borrowed', 'Phòng CLB sách'],
-  ['20000000-0000-4000-8000-000000000007', users[3].id, 'Tôi Thấy Hoa Vàng Trên Cỏ Xanh', 'Văn học', 'Nguyễn Nhật Ánh', 2018, 'good', 'exchanged', 'Sân sau nhà C'],
-  ['20000000-0000-4000-8000-000000000008', users[0].id, 'Designing Data-Intensive Applications', 'Hệ thống', 'Martin Kleppmann', 2020, 'good', 'available', 'Văn phòng khoa CNTT'],
-  ['20000000-0000-4000-8000-000000000009', users[1].id, 'Không Gia Đình', 'Văn học', 'Hector Malot', 2017, 'used', 'negotiating', 'Sảnh nhà A'],
+  ['20000000-0000-4000-8000-000000000001', users[2].id, 'Đắc Nhân Tâm', 'Kỹ năng', 'Dale Carnegie', 2021, 'good', 'negotiating', 'Tủ sách CLB - tầng 2 thư viện', null],
+  ['20000000-0000-4000-8000-000000000002', users[1].id, 'Nhà Giả Kim', 'Tiểu thuyết', 'Paulo Coelho', 2020, 'used', 'borrowed', 'Sảnh nhà A', null],
+  ['20000000-0000-4000-8000-000000000003', users[3].id, 'Clean Code', 'Lập trình', 'Robert C. Martin', 2019, 'good', 'available', 'Phòng lab 302', null],
+  ['20000000-0000-4000-8000-000000000004', users[4].id, 'Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Truyền cảm hứng', 'Rosie Nguyễn', 2022, 'new', 'available', 'Quầy sinh viên tình nguyện', null],
+  ['20000000-0000-4000-8000-000000000005', users[5].id, 'Atomic Habits', 'Kỹ năng', 'James Clear', 2023, 'good', 'negotiating', 'Ký túc xá B1', null],
+  ['20000000-0000-4000-8000-000000000006', users[2].id, 'SQL for Data Analysis', 'Dữ liệu', 'Cathy Tanimura', 2021, 'used', 'borrowed', 'Phòng CLB sách', null],
+  ['20000000-0000-4000-8000-000000000007', users[3].id, 'Tôi Thấy Hoa Vàng Trên Cỏ Xanh', 'Văn học', 'Nguyễn Nhật Ánh', 2018, 'good', 'exchanged', 'Sân sau nhà C', null],
+  ['20000000-0000-4000-8000-000000000008', users[0].id, 'Designing Data-Intensive Applications', 'Hệ thống', 'Martin Kleppmann', 2020, 'good', 'available', 'Văn phòng khoa CNTT', null],
+  ['20000000-0000-4000-8000-000000000009', users[1].id, 'Không Gia Đình', 'Văn học', 'Hector Malot', 2017, 'used', 'negotiating', 'Sảnh nhà A', null],
 ]
 
 const transactions = [
@@ -326,9 +338,31 @@ try {
       public.complaints,
       public.deliveries,
       public.book_transactions,
+      public.account_addresses,
       public.books
     restart identity cascade
   `)
+
+  for (const address of accountAddresses) {
+    await client.query(
+      `
+      insert into public.account_addresses (
+        id,
+        account_id,
+        label,
+        address_text,
+        is_default
+      )
+      values ($1, $2, $3, $4, $5)
+      on conflict (id) do update set
+        account_id = excluded.account_id,
+        label = excluded.label,
+        address_text = excluded.address_text,
+        is_default = excluded.is_default
+      `,
+      address,
+    )
+  }
 
   for (const book of books) {
     await client.query(
@@ -342,9 +376,10 @@ try {
         publication_year,
         condition,
         status,
-        pickup_location
+        pickup_location,
+        cover_image_url
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       on conflict (id) do update set
         owner_account_id = excluded.owner_account_id,
         title = excluded.title,
@@ -353,7 +388,8 @@ try {
         publication_year = excluded.publication_year,
         condition = excluded.condition,
         status = excluded.status,
-        pickup_location = excluded.pickup_location
+        pickup_location = excluded.pickup_location,
+        cover_image_url = excluded.cover_image_url
       `,
       book,
     )
@@ -544,7 +580,7 @@ try {
   }
 
   await client.query('commit')
-  console.log(`Seeded ${users.length} users, ${books.length} books, ${transactions.length} transactions.`)
+  console.log(`Seeded ${users.length} users, ${accountAddresses.length} addresses, ${books.length} books, ${transactions.length} transactions.`)
   console.log('Sample password for seeded users: Bookshare123!')
 } catch (error) {
   await client.query('rollback')

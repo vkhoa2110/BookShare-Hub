@@ -431,6 +431,65 @@
   align-items: end;
 }
 
+.book-form.redesigned {
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.book-form-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.cover-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cover-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cover-picker > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  color: #24755d;
+  background: #eff7ed;
+  border: 1px solid #c9dfc8;
+  border-radius: 8px;
+}
+
+.cover-preview {
+  display: grid;
+  min-height: 214px;
+  place-items: center;
+  overflow: hidden;
+  color: #ffffff;
+  background: #355f91;
+  border-radius: 8px;
+}
+
+.cover-preview img,
+.book-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .complaint-form {
   grid-template-columns: minmax(180px, 0.8fr) minmax(180px, 0.8fr) minmax(240px, 1.4fr) auto;
 }
@@ -573,15 +632,33 @@ textarea:focus {
 .book-cover {
   display: grid;
   align-content: space-between;
+  min-height: 100%;
+  overflow: hidden;
   padding: 16px;
   color: #ffffff;
   font-weight: 800;
+}
+
+.book-cover.small {
+  width: 48px;
+  height: 64px;
+  min-height: 64px;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.book-cover.with-image {
+  padding: 0;
 }
 
 .book-cover span {
   overflow-wrap: anywhere;
   font-size: 13px;
   line-height: 1.25;
+}
+
+.book-cover.small span {
+  display: none;
 }
 
 .condition-new {
@@ -628,6 +705,96 @@ textarea:focus {
 
 .contact-strip span {
   overflow-wrap: anywhere;
+}
+
+.my-books-board {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.my-books-board h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.mini-book-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mini-book-item,
+.address-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px;
+  background: #f7f9f8;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mini-book-item > div:last-child,
+.address-item > div:first-child {
+  min-width: 0;
+}
+
+.mini-book-item strong,
+.mini-book-item span,
+.address-item strong,
+.address-item span {
+  display: block;
+}
+
+.mini-book-item strong,
+.address-item strong {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-book-item span,
+.address-item span {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.address-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.address-item {
+  align-items: flex-start;
+}
+
+.address-item > div:first-child {
+  flex: 1 1 auto;
+}
+
+.address-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.check-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.check-line input {
+  width: 18px;
+  min-height: 18px;
 }
 
 .card-title-row,
@@ -1176,8 +1343,14 @@ td {
   }
 
   .book-form,
+  .book-form.redesigned,
+  .book-form-fields,
   .complaint-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cover-picker {
+    grid-column: 1 / -1;
   }
 
   .form-actions {
@@ -1212,6 +1385,9 @@ td {
   .toolbar,
   .book-grid,
   .book-form,
+  .book-form.redesigned,
+  .book-form-fields,
+  .my-books-board,
   .complaint-form,
   .demo-account-grid {
     grid-template-columns: 1fr;

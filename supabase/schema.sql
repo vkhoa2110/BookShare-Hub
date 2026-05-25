@@ -12,6 +12,16 @@ create table if not exists public.accounts (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.account_addresses (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  label text not null default 'Địa chỉ',
+  address_text text not null,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.books (
   id uuid primary key default gen_random_uuid(),
   owner_account_id uuid not null references public.accounts(id) on delete cascade,
@@ -21,6 +31,7 @@ create table if not exists public.books (
   publication_year integer check (publication_year between 1000 and extract(year from now())::integer + 1),
   condition text not null check (condition in ('new', 'good', 'used', 'worn')),
   pickup_location text not null default 'Chưa cập nhật',
+  cover_image_url text,
   status text not null default 'available' check (status in ('available', 'negotiating', 'exchanged', 'borrowed', 'returned', 'hidden')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -98,6 +109,7 @@ create table if not exists public.point_ledger (
 create index if not exists books_search_idx on public.books using gin (
   to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(author, '') || ' ' || coalesce(category, ''))
 );
+create index if not exists account_addresses_account_idx on public.account_addresses(account_id, is_default desc, created_at desc);
 create index if not exists books_owner_idx on public.books(owner_account_id);
 create index if not exists transactions_owner_idx on public.book_transactions(owner_account_id);
 create index if not exists transactions_borrower_idx on public.book_transactions(borrower_account_id);
@@ -105,7 +117,8 @@ create index if not exists deliveries_status_idx on public.deliveries(status);
 create index if not exists point_ledger_account_idx on public.point_ledger(account_id, created_at desc);
 
 alter table public.books
-add column if not exists pickup_location text not null default 'Chưa cập nhật';
+add column if not exists pickup_location text not null default 'Chưa cập nhật',
+add column if not exists cover_image_url text;
 
 alter table public.book_transactions
 add column if not exists pickup_location text,
@@ -157,6 +170,11 @@ $$;
 drop trigger if exists touch_accounts_updated_at on public.accounts;
 create trigger touch_accounts_updated_at
 before update on public.accounts
+for each row execute function public.touch_updated_at();
+
+drop trigger if exists touch_account_addresses_updated_at on public.account_addresses;
+create trigger touch_account_addresses_updated_at
+before update on public.account_addresses
 for each row execute function public.touch_updated_at();
 
 drop trigger if exists touch_books_updated_at on public.books;
@@ -843,6 +861,7 @@ end;
 $$;
 
 alter table public.accounts enable row level security;
+alter table public.account_addresses enable row level security;
 alter table public.books enable row level security;
 alter table public.book_transactions enable row level security;
 alter table public.transaction_history enable row level security;
@@ -868,6 +887,31 @@ on public.accounts for update
 to authenticated
 using (id = auth.uid())
 with check (id = auth.uid());
+
+drop policy if exists account_addresses_select_own on public.account_addresses;
+create policy account_addresses_select_own
+on public.account_addresses for select
+to authenticated
+using (account_id = auth.uid() or public.current_account_is_admin());
+
+drop policy if exists account_addresses_insert_own on public.account_addresses;
+create policy account_addresses_insert_own
+on public.account_addresses for insert
+to authenticated
+with check (account_id = auth.uid());
+
+drop policy if exists account_addresses_update_own on public.account_addresses;
+create policy account_addresses_update_own
+on public.account_addresses for update
+to authenticated
+using (account_id = auth.uid())
+with check (account_id = auth.uid());
+
+drop policy if exists account_addresses_delete_own on public.account_addresses;
+create policy account_addresses_delete_own
+on public.account_addresses for delete
+to authenticated
+using (account_id = auth.uid());
 
 drop policy if exists books_select_authenticated on public.books;
 create policy books_select_authenticated
@@ -961,6 +1005,44 @@ on public.point_ledger for select
 to authenticated
 using (account_id = auth.uid() or public.current_account_is_admin());
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'book-covers',
+  'book-covers',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists book_covers_public_select on storage.objects;
+create policy book_covers_public_select
+on storage.objects for select
+to public
+using (bucket_id = 'book-covers');
+
+drop policy if exists book_covers_insert_own_folder on storage.objects;
+create policy book_covers_insert_own_folder
+on storage.objects for insert
+to authenticated
+with check (bucket_id = 'book-covers' and name like auth.uid()::text || '/%');
+
+drop policy if exists book_covers_update_own_folder on storage.objects;
+create policy book_covers_update_own_folder
+on storage.objects for update
+to authenticated
+using (bucket_id = 'book-covers' and name like auth.uid()::text || '/%')
+with check (bucket_id = 'book-covers' and name like auth.uid()::text || '/%');
+
+drop policy if exists book_covers_delete_own_folder on storage.objects;
+create policy book_covers_delete_own_folder
+on storage.objects for delete
+to authenticated
+using (bucket_id = 'book-covers' and name like auth.uid()::text || '/%');
+
 revoke execute on function public.add_points(uuid, integer, text, uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.create_transaction_request(uuid, text, text, timestamptz, text, text) from public, anon;
 revoke execute on function public.respond_transaction(uuid, boolean, text) from public, anon;
@@ -972,9 +1054,10 @@ revoke execute on function public.take_delivery(uuid) from public, anon;
 revoke execute on function public.update_delivery_status(uuid, text) from public, anon;
 
 grant usage on schema public to authenticated, anon;
-grant select on public.accounts, public.books to authenticated;
+grant select on public.accounts, public.account_addresses, public.books to authenticated;
 grant insert (id, full_name, phone_number, email_address) on public.accounts to authenticated;
 grant update (full_name, phone_number) on public.accounts to authenticated;
+grant insert, update, delete on public.account_addresses to authenticated;
 grant select, insert, update on public.books to authenticated;
 grant select on public.book_transactions, public.transaction_history, public.deliveries, public.point_ledger to authenticated;
 grant select, insert on public.complaints to authenticated;
