@@ -20,6 +20,7 @@ create table if not exists public.books (
   author text not null,
   publication_year integer check (publication_year between 1000 and extract(year from now())::integer + 1),
   condition text not null check (condition in ('new', 'good', 'used', 'worn')),
+  pickup_location text not null default 'Chưa cập nhật',
   status text not null default 'available' check (status in ('available', 'negotiating', 'exchanged', 'borrowed', 'returned', 'hidden')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -32,7 +33,9 @@ create table if not exists public.book_transactions (
   borrower_account_id uuid not null references public.accounts(id) on delete restrict,
   transaction_type text not null check (transaction_type in ('exchange', 'borrow')),
   delivery_method text not null default 'self_pickup' check (delivery_method in ('self_pickup', 'volunteer')),
-  status text not null default 'requested' check (status in ('requested', 'accepted', 'rejected', 'cancelled', 'owner_confirmed', 'borrower_confirmed', 'completed', 'return_requested', 'returned')),
+  status text not null default 'requested' check (status in ('requested', 'accepted', 'rejected', 'cancelled', 'delivered', 'completed', 'return_requested', 'returned')),
+  pickup_location text,
+  dropoff_location text,
   borrow_date timestamptz,
   return_due_at timestamptz,
   actual_return_date_at timestamptz,
@@ -101,6 +104,13 @@ create index if not exists transactions_borrower_idx on public.book_transactions
 create index if not exists deliveries_status_idx on public.deliveries(status);
 create index if not exists point_ledger_account_idx on public.point_ledger(account_id, created_at desc);
 
+alter table public.books
+add column if not exists pickup_location text not null default 'Chưa cập nhật';
+
+alter table public.book_transactions
+add column if not exists pickup_location text,
+add column if not exists dropoff_location text;
+
 alter table public.deliveries
 add column if not exists delivery_type text not null default 'outbound';
 
@@ -108,6 +118,10 @@ create index if not exists deliveries_transaction_type_idx on public.deliveries(
 
 do $$
 begin
+  update public.book_transactions
+  set status = 'accepted'
+  where status in ('owner_confirmed', 'borrower_confirmed');
+
   alter table public.book_transactions
     drop constraint if exists book_transactions_status_check;
   alter table public.book_transactions
@@ -117,8 +131,7 @@ begin
       'accepted',
       'rejected',
       'cancelled',
-      'owner_confirmed',
-      'borrower_confirmed',
+      'delivered',
       'completed',
       'return_requested',
       'returned'
@@ -317,12 +330,18 @@ begin
     raise exception 'Không đủ điểm để gửi yêu cầu';
   end if;
 
+  if coalesce(nullif(p_dropoff_location, ''), nullif(p_pickup_location, '')) is null then
+    raise exception 'Cần nhập địa chỉ hoặc điểm hẹn nhận sách';
+  end if;
+
   insert into public.book_transactions (
     book_id,
     owner_account_id,
     borrower_account_id,
     transaction_type,
     delivery_method,
+    pickup_location,
+    dropoff_location,
     return_due_at
   )
   values (
@@ -331,6 +350,8 @@ begin
     auth.uid(),
     p_transaction_type,
     p_delivery_method,
+    v_book.pickup_location,
+    coalesce(nullif(p_dropoff_location, ''), nullif(p_pickup_location, '')),
     case when p_transaction_type = 'borrow' then p_return_due_at else null end
   )
   returning id into v_transaction_id;
@@ -351,21 +372,6 @@ begin
     auth.uid(),
     'Tạo yêu cầu giao dịch'
   );
-
-  if p_delivery_method = 'volunteer' then
-    insert into public.deliveries (
-      transaction_id,
-      delivery_type,
-      pickup_location,
-      dropoff_location
-    )
-    values (
-      v_transaction_id,
-      'outbound',
-      coalesce(nullif(p_pickup_location, ''), 'Chưa cập nhật'),
-      coalesce(nullif(p_dropoff_location, ''), 'Chưa cập nhật')
-    );
-  end if;
 
   return v_transaction_id;
 end;
@@ -405,13 +411,34 @@ begin
   v_next_status := case when p_accept then 'accepted' else 'rejected' end;
 
   update public.book_transactions
-  set status = v_next_status
+  set status = v_next_status,
+      owner_confirmed_at = case when p_accept and owner_confirmed_at is null then now() else owner_confirmed_at end
   where id = p_transaction_id;
 
   if p_accept then
     update public.books
     set status = 'negotiating'
     where id = v_transaction.book_id;
+
+    if v_transaction.delivery_method = 'volunteer' then
+      insert into public.deliveries (
+        transaction_id,
+        delivery_type,
+        pickup_location,
+        dropoff_location
+      )
+      select
+        p_transaction_id,
+        'outbound',
+        coalesce(nullif(v_transaction.pickup_location, ''), 'Chưa cập nhật'),
+        coalesce(nullif(v_transaction.dropoff_location, ''), 'Chưa cập nhật')
+      where not exists (
+        select 1
+        from public.deliveries
+        where transaction_id = p_transaction_id
+          and delivery_type = 'outbound'
+      );
+    end if;
   else
     update public.books
     set status = 'available'
@@ -446,11 +473,9 @@ set search_path = public
 as $$
 declare
   v_transaction public.book_transactions%rowtype;
-  v_next_status text;
-  v_owner_confirmed timestamptz;
-  v_borrower_confirmed timestamptz;
   v_owner_delta integer;
   v_borrower_delta integer;
+  v_pending_outbound_delivery_count integer;
 begin
   select * into v_transaction
   from public.book_transactions
@@ -461,41 +486,35 @@ begin
     raise exception 'Không tìm thấy giao dịch';
   end if;
 
-  if auth.uid() not in (v_transaction.owner_account_id, v_transaction.borrower_account_id) then
-    raise exception 'Bạn không thuộc giao dịch này';
+  if v_transaction.borrower_account_id <> auth.uid() then
+    raise exception 'Chỉ người nhận sách được xác nhận đã nhận sách';
   end if;
 
-  if v_transaction.status not in ('accepted', 'owner_confirmed', 'borrower_confirmed') then
-    raise exception 'Giao dịch chưa thể xác nhận';
+  if v_transaction.delivery_method = 'self_pickup' and v_transaction.status <> 'accepted' then
+    raise exception 'Giao dịch tự giao nhận chưa thể xác nhận';
   end if;
 
-  v_owner_confirmed := v_transaction.owner_confirmed_at;
-  v_borrower_confirmed := v_transaction.borrower_confirmed_at;
-
-  if auth.uid() = v_transaction.owner_account_id then
-    v_owner_confirmed := coalesce(v_owner_confirmed, now());
+  if v_transaction.delivery_method = 'volunteer' and v_transaction.status <> 'delivered' then
+    raise exception 'Người giao sách chưa xác nhận đã giao xong';
   end if;
 
-  if auth.uid() = v_transaction.borrower_account_id then
-    v_borrower_confirmed := coalesce(v_borrower_confirmed, now());
-  end if;
+  select count(*) into v_pending_outbound_delivery_count
+  from public.deliveries
+  where transaction_id = p_transaction_id
+    and delivery_type = 'outbound'
+    and status <> 'delivered';
 
-  if v_owner_confirmed is not null and v_borrower_confirmed is not null then
-    v_next_status := 'completed';
-  elsif v_owner_confirmed is not null then
-    v_next_status := 'owner_confirmed';
-  else
-    v_next_status := 'borrower_confirmed';
+  if v_pending_outbound_delivery_count > 0 then
+    raise exception 'Đơn giao sách chưa hoàn tất';
   end if;
 
   update public.book_transactions
-  set owner_confirmed_at = v_owner_confirmed,
-      borrower_confirmed_at = v_borrower_confirmed,
+  set borrower_confirmed_at = coalesce(borrower_confirmed_at, now()),
       borrow_date = case
-        when v_next_status = 'completed' and transaction_type = 'borrow' and borrow_date is null then now()
+        when transaction_type = 'borrow' and borrow_date is null then now()
         else borrow_date
       end,
-      status = v_next_status
+      status = 'completed'
   where id = p_transaction_id;
 
   insert into public.transaction_history (
@@ -506,12 +525,12 @@ begin
   )
   values (
     p_transaction_id,
-    v_next_status,
+    'completed',
     auth.uid(),
-    'Xác nhận giao nhận sách'
+    'Người nhận xác nhận đã nhận sách'
   );
 
-  if v_next_status = 'completed' and v_transaction.points_applied_at is null then
+  if v_transaction.points_applied_at is null then
     v_owner_delta := case when v_transaction.transaction_type = 'exchange' then 10 else 5 end;
     v_borrower_delta := -v_owner_delta;
 
@@ -583,6 +602,10 @@ begin
     raise exception 'Hình thức hoàn trả không hợp lệ';
   end if;
 
+  if p_delivery_method = 'volunteer' and nullif(p_pickup_location, '') is null then
+    raise exception 'Cần nhập địa chỉ lấy sách trả';
+  end if;
+
   update public.book_transactions
   set status = 'return_requested'
   where id = p_transaction_id;
@@ -614,7 +637,7 @@ begin
       p_transaction_id,
       'return',
       coalesce(nullif(p_pickup_location, ''), 'Chưa cập nhật'),
-      coalesce(nullif(p_dropoff_location, ''), 'Chưa cập nhật')
+      coalesce(nullif(v_transaction.pickup_location, ''), nullif(p_dropoff_location, ''), 'Chưa cập nhật')
     );
   end if;
 end;
@@ -738,7 +761,7 @@ as $$
 declare
   v_delivery public.deliveries%rowtype;
 begin
-  if p_status not in ('accepted', 'in_transit', 'delivered') then
+  if p_status not in ('in_transit', 'delivered') then
     raise exception 'Trạng thái giao sách không hợp lệ';
   end if;
 
@@ -755,10 +778,53 @@ begin
     raise exception 'Chỉ người nhận giao được cập nhật đơn này';
   end if;
 
+  if p_status = 'in_transit' and v_delivery.status <> 'accepted' then
+    raise exception 'Chỉ đơn đã nhận mới được chuyển sang đang giao';
+  end if;
+
+  if p_status = 'delivered' and v_delivery.status <> 'in_transit' then
+    raise exception 'Cần chuyển đơn sang đang giao trước khi xác nhận đã giao';
+  end if;
+
   update public.deliveries
   set status = p_status,
       delivered_at = case when p_status = 'delivered' and delivered_at is null then now() else delivered_at end
   where id = p_delivery_id;
+
+  if p_status = 'delivered' then
+    if v_delivery.delivery_type = 'outbound' then
+      update public.book_transactions
+      set status = 'delivered'
+      where id = v_delivery.transaction_id
+        and status = 'accepted';
+
+      insert into public.transaction_history (
+        transaction_id,
+        status_updated_to,
+        updated_by_account_id,
+        note
+      )
+      values (
+        v_delivery.transaction_id,
+        'delivered',
+        auth.uid(),
+        'Người giao sách xác nhận đã giao sách cho người nhận'
+      );
+    else
+      insert into public.transaction_history (
+        transaction_id,
+        status_updated_to,
+        updated_by_account_id,
+        note
+      )
+      values (
+        v_delivery.transaction_id,
+        'return_requested',
+        auth.uid(),
+        'Người giao sách xác nhận đã giao sách lượt trả'
+      );
+    end if;
+  end if;
 
   if p_status = 'delivered' and v_delivery.points_applied_at is null then
     perform public.add_points(

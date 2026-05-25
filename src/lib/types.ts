@@ -14,8 +14,7 @@ export type TransactionStatus =
   | 'accepted'
   | 'rejected'
   | 'cancelled'
-  | 'owner_confirmed'
-  | 'borrower_confirmed'
+  | 'delivered'
   | 'completed'
   | 'return_requested'
   | 'returned'
@@ -43,6 +42,7 @@ export type Book = {
   author: string
   publication_year: number | null
   condition: BookCondition
+  pickup_location: string
   status: BookStatus
   created_at: string
   updated_at: string
@@ -56,6 +56,8 @@ export type BookTransaction = {
   transaction_type: TransactionType
   delivery_method: DeliveryMethod
   status: TransactionStatus
+  pickup_location: string | null
+  dropoff_location: string | null
   borrow_date: string | null
   return_due_at: string | null
   actual_return_date_at: string | null

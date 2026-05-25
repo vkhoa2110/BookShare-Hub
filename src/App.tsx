@@ -16,6 +16,7 @@ import {
   Library,
   LogOut,
   Mail,
+  MapPin,
   MessageSquareWarning,
   PackageCheck,
   Pencil,
@@ -70,6 +71,7 @@ type BookForm = {
   author: string
   publication_year: string
   condition: BookCondition
+  pickup_location: string
 }
 
 type RequestForm = {
@@ -98,6 +100,7 @@ const emptyBookForm: BookForm = {
   author: '',
   publication_year: '',
   condition: 'good',
+  pickup_location: '',
 }
 
 const emptyRequestForm: RequestForm = {
@@ -409,7 +412,7 @@ function App() {
   const activeTransactions = useMemo(() => {
     return myTransactions.filter(
       (transaction) =>
-        ['requested', 'accepted', 'owner_confirmed', 'borrower_confirmed', 'return_requested'].includes(
+        ['requested', 'accepted', 'delivered', 'return_requested'].includes(
           transaction.status,
         ) ||
         (transaction.transaction_type === 'borrow' && transaction.status === 'completed'),
@@ -543,6 +546,7 @@ function App() {
       author: bookForm.author.trim(),
       publication_year: bookForm.publication_year ? Number(bookForm.publication_year) : null,
       condition: bookForm.condition,
+      pickup_location: bookForm.pickup_location.trim(),
     }
 
     await runAction(
@@ -570,6 +574,7 @@ function App() {
       author: book.author,
       publication_year: book.publication_year ? String(book.publication_year) : '',
       condition: book.condition,
+      pickup_location: book.pickup_location || '',
     })
     setActiveView('books')
   }
@@ -605,10 +610,8 @@ function App() {
           requestForm.transaction_type === 'borrow' && requestForm.return_due_at
             ? new Date(requestForm.return_due_at).toISOString()
             : null,
-        p_pickup_location:
-          requestForm.delivery_method === 'volunteer' ? requestForm.pickup_location.trim() || null : null,
-        p_dropoff_location:
-          requestForm.delivery_method === 'volunteer' ? requestForm.dropoff_location.trim() || null : null,
+        p_pickup_location: null,
+        p_dropoff_location: requestForm.dropoff_location.trim() || null,
       })
 
       if (error) {
@@ -640,7 +643,7 @@ function App() {
   }
 
   async function confirmTransaction(transactionId: string) {
-    await runAction(`confirm-${transactionId}`, 'Đã ghi nhận xác nhận giao dịch.', async () => {
+    await runAction(`confirm-${transactionId}`, 'Đã xác nhận đã nhận sách.', async () => {
       const { error } = await supabase.rpc('confirm_transaction', {
         p_transaction_id: transactionId,
       })
@@ -664,8 +667,7 @@ function App() {
         p_delivery_method: returnForm.delivery_method,
         p_pickup_location:
           returnForm.delivery_method === 'volunteer' ? returnForm.pickup_location.trim() || null : null,
-        p_dropoff_location:
-          returnForm.delivery_method === 'volunteer' ? returnForm.dropoff_location.trim() || null : null,
+        p_dropoff_location: null,
       })
 
       if (error) {
@@ -1145,8 +1147,8 @@ function DashboardView({
     return (
       (isOwner && transaction.status === 'requested') ||
       (isOwner && transaction.status === 'return_requested') ||
-      (isOwner && ['accepted', 'borrower_confirmed'].includes(transaction.status) && !transaction.owner_confirmed_at) ||
-      (isBorrower && ['accepted', 'owner_confirmed'].includes(transaction.status) && !transaction.borrower_confirmed_at)
+      (isBorrower && transaction.delivery_method === 'self_pickup' && transaction.status === 'accepted') ||
+      (isBorrower && transaction.delivery_method === 'volunteer' && transaction.status === 'delivered')
     )
   })
 
@@ -1449,6 +1451,14 @@ function BooksView({
               ))}
             </select>
           </Field>
+          <Field label="Địa điểm sách">
+            <input
+              required
+              value={bookForm.pickup_location}
+              onChange={(event) => onBookFormChange({ ...bookForm, pickup_location: event.target.value })}
+              placeholder="CLB sách, tòa nhà, khu vực"
+            />
+          </Field>
           <div className="form-actions">
             <ActionButton
               icon={editingBookId ? Check : Plus}
@@ -1498,8 +1508,16 @@ function BooksView({
                     <dt>Năm</dt>
                     <dd>{book.publication_year || 'Chưa rõ'}</dd>
                   </div>
+                  <div>
+                    <dt>Địa điểm</dt>
+                    <dd>{book.pickup_location || 'Chưa cập nhật'}</dd>
+                  </div>
                 </dl>
                 <div className="contact-strip">
+                  <span>
+                    <MapPin size={14} />
+                    {book.pickup_location || 'Chưa cập nhật'}
+                  </span>
                   <span>
                     <Mail size={14} />
                     {owner?.email_address || 'Chưa có email'}
@@ -1570,15 +1588,18 @@ function TransactionsView({
         const transactionDeliveries = deliveries.get(transaction.id) || []
         const isOwner = transaction.owner_account_id === account?.id
         const isBorrower = transaction.borrower_account_id === account?.id
+        const outboundDeliveries = transactionDeliveries.filter((delivery) => delivery.delivery_type === 'outbound')
         const hasPendingReturnDelivery = transactionDeliveries.some(
           (delivery) =>
             delivery.delivery_type === 'return' && !['delivered', 'cancelled'].includes(delivery.status),
         )
-        const canConfirm =
-          (isOwner || isBorrower) &&
-          ['accepted', 'owner_confirmed', 'borrower_confirmed'].includes(transaction.status) &&
-          ((isOwner && !transaction.owner_confirmed_at) ||
-            (isBorrower && !transaction.borrower_confirmed_at))
+        const hasPendingOutboundDelivery = outboundDeliveries.some((delivery) => delivery.status !== 'delivered')
+        const canConfirmReceipt =
+          isBorrower &&
+          ((transaction.delivery_method === 'self_pickup' && transaction.status === 'accepted') ||
+            (transaction.delivery_method === 'volunteer' &&
+              transaction.status === 'delivered' &&
+              !hasPendingOutboundDelivery))
         const canRequestReturn =
           isBorrower && transaction.transaction_type === 'borrow' && transaction.status === 'completed'
         const canConfirmReturn =
@@ -1609,6 +1630,16 @@ function TransactionsView({
                     <dt>Giao nhận</dt>
                     <dd>{deliveryMethodLabels[transaction.delivery_method]}</dd>
                   </div>
+                  <div>
+                    <dt>Lấy sách</dt>
+                    <dd>{transaction.pickup_location || book?.pickup_location || 'Chưa cập nhật'}</dd>
+                  </div>
+                  {transaction.dropoff_location && (
+                    <div>
+                      <dt>Nhận sách</dt>
+                      <dd>{transaction.dropoff_location || 'Chưa cập nhật'}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt>Điểm</dt>
                     <dd>+{pointRule[transaction.transaction_type]} / -{pointRule[transaction.transaction_type]}</dd>
@@ -1658,14 +1689,14 @@ function TransactionsView({
                   </ActionButton>
                 </>
               )}
-              {canConfirm && (
+              {canConfirmReceipt && (
                 <ActionButton
                   type="button"
                   icon={PackageCheck}
                   busy={busyKey === `confirm-${transaction.id}`}
                   onClick={() => onConfirm(transaction)}
                 >
-                  Xác nhận
+                  Đã nhận sách
                 </ActionButton>
               )}
               {canRequestReturn && (
@@ -1784,7 +1815,7 @@ function DeliveriesView({
                   Đang giao
                 </ActionButton>
               )}
-              {delivery.status !== 'delivered' && delivery.status !== 'cancelled' && (
+              {delivery.status === 'in_transit' && (
                 <ActionButton
                   type="button"
                   icon={PackageCheck}
@@ -2295,26 +2326,22 @@ function RequestDialog({
               <option value="volunteer">Nhờ người giao sách miễn phí</option>
             </select>
           </Field>
-          {form.delivery_method === 'volunteer' && (
-            <>
-              <Field label="Điểm nhận sách">
-                <input
-                  required
-                  value={form.pickup_location}
-                  onChange={(event) => onFormChange({ ...form, pickup_location: event.target.value })}
-                  placeholder="Tòa nhà, phòng, khu vực"
-                />
-              </Field>
-              <Field label="Điểm giao sách">
-                <input
-                  required
-                  value={form.dropoff_location}
-                  onChange={(event) => onFormChange({ ...form, dropoff_location: event.target.value })}
-                  placeholder="Tòa nhà, phòng, khu vực"
-                />
-              </Field>
-            </>
-          )}
+          <div className="dialog-note">
+            <MapPin size={16} />
+            <span>Địa điểm lấy sách từ chủ sở hữu: {book.pickup_location || 'Chưa cập nhật'}</span>
+          </div>
+          <Field label="Địa chỉ/điểm hẹn nhận sách">
+            <input
+              required
+              value={form.dropoff_location}
+              onChange={(event) => onFormChange({ ...form, dropoff_location: event.target.value })}
+              placeholder={
+                form.delivery_method === 'volunteer'
+                  ? 'Nơi người giao sách mang sách tới'
+                  : 'Nơi hai bên tự gặp để nhận sách'
+              }
+            />
+          </Field>
           <div className="point-check">
             <CircleDollarSign size={18} />
             <span>
@@ -2351,8 +2378,6 @@ function ReturnDialog({
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
-  void transaction
-
   return (
     <div className="dialog-backdrop" role="presentation">
       <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="return-title">
@@ -2382,28 +2407,18 @@ function ReturnDialog({
             </select>
           </Field>
           {form.delivery_method === 'volunteer' && (
-            <>
-              <Field label="Điểm lấy sách trả">
-                <input
-                  required
-                  value={form.pickup_location}
-                  onChange={(event) => onFormChange({ ...form, pickup_location: event.target.value })}
-                  placeholder="Nơi người mượn bàn giao sách"
-                />
-              </Field>
-              <Field label="Điểm trả cho chủ sách">
-                <input
-                  required
-                  value={form.dropoff_location}
-                  onChange={(event) => onFormChange({ ...form, dropoff_location: event.target.value })}
-                  placeholder="Nơi chủ sách nhận lại sách"
-                />
-              </Field>
-            </>
+            <Field label="Địa chỉ lấy sách trả">
+              <input
+                required
+                value={form.pickup_location}
+                onChange={(event) => onFormChange({ ...form, pickup_location: event.target.value })}
+                placeholder="Nơi người giao sách lấy sách từ người mượn"
+              />
+            </Field>
           )}
           <div className="dialog-note">
-            <PackageCheck size={16} />
-            <span>Chỉ giao dịch mượn có hoàn trả mới có bước này; trao đổi vĩnh viễn sẽ kết thúc sau xác nhận giao sách.</span>
+            <MapPin size={16} />
+            <span>Điểm trả cho chủ sách: {transaction.pickup_location || book?.pickup_location || 'Chưa cập nhật'}</span>
           </div>
           <ActionButton icon={PackageCheck} busy={busy}>
             Tạo yêu cầu trả sách
@@ -2627,15 +2642,21 @@ function getTransactionActionText(transaction: BookTransaction, accountId?: stri
   }
 
   if (transaction.status === 'accepted') {
-    return 'Hai bên cần xác nhận sau khi giao nhận sách.'
+    if (transaction.delivery_method === 'volunteer') {
+      return isBorrower
+        ? 'Chờ người giao sách nhận đơn và giao xong rồi bạn xác nhận đã nhận.'
+        : 'Bạn đã đồng ý giao dịch; chờ người giao sách và người nhận xử lý.'
+    }
+
+    return isBorrower
+      ? 'Sau khi nhận sách trực tiếp, bấm Đã nhận sách để hoàn tất.'
+      : 'Bạn đã đồng ý giao dịch; chờ người nhận xác nhận đã nhận sách.'
   }
 
-  if (transaction.status === 'owner_confirmed') {
-    return isBorrower ? 'Bạn cần xác nhận đã nhận sách.' : 'Đang chờ người nhận xác nhận.'
-  }
-
-  if (transaction.status === 'borrower_confirmed') {
-    return isOwner ? 'Bạn cần xác nhận đã giao sách.' : 'Đang chờ chủ sách xác nhận.'
+  if (transaction.status === 'delivered') {
+    return isBorrower
+      ? 'Người giao sách đã giao xong, bạn cần xác nhận đã nhận sách.'
+      : 'Người giao sách đã giao xong, chờ người nhận xác nhận.'
   }
 
   if (transaction.status === 'completed' && transaction.transaction_type === 'borrow') {
@@ -2667,7 +2688,7 @@ function statusTone(status: string) {
   }
 
   if (
-    ['requested', 'negotiating', 'owner_confirmed', 'borrower_confirmed', 'return_requested', 'open', 'reviewing'].includes(
+    ['requested', 'negotiating', 'return_requested', 'open', 'reviewing'].includes(
       status,
     )
   ) {

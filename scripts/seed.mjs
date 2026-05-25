@@ -29,7 +29,7 @@ const users = [
     fullName: 'Nguyễn Phi Hùng',
     phone: '0900000002',
     role: 'member',
-    points: 30,
+    points: 25,
   },
   {
     id: '10000000-0000-4000-8000-000000000003',
@@ -37,7 +37,7 @@ const users = [
     fullName: 'Lê Văn Khoa',
     phone: '0900000003',
     role: 'member',
-    points: 25,
+    points: 20,
   },
   {
     id: '10000000-0000-4000-8000-000000000004',
@@ -45,7 +45,7 @@ const users = [
     fullName: 'Đinh Viết Huy',
     phone: '0900000004',
     role: 'member',
-    points: 15,
+    points: 25,
   },
   {
     id: '10000000-0000-4000-8000-000000000005',
@@ -53,7 +53,7 @@ const users = [
     fullName: 'Mai Lan',
     phone: '0900000005',
     role: 'volunteer',
-    points: 12,
+    points: 16,
   },
   {
     id: '10000000-0000-4000-8000-000000000006',
@@ -66,14 +66,15 @@ const users = [
 ]
 
 const books = [
-  ['20000000-0000-4000-8000-000000000001', users[2].id, 'Đắc Nhân Tâm', 'Kỹ năng', 'Dale Carnegie', 2021, 'good', 'available'],
-  ['20000000-0000-4000-8000-000000000002', users[1].id, 'Nhà Giả Kim', 'Tiểu thuyết', 'Paulo Coelho', 2020, 'used', 'available'],
-  ['20000000-0000-4000-8000-000000000003', users[3].id, 'Clean Code', 'Lập trình', 'Robert C. Martin', 2019, 'good', 'available'],
-  ['20000000-0000-4000-8000-000000000004', users[4].id, 'Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Truyền cảm hứng', 'Rosie Nguyễn', 2022, 'new', 'available'],
-  ['20000000-0000-4000-8000-000000000005', users[5].id, 'Atomic Habits', 'Kỹ năng', 'James Clear', 2023, 'good', 'negotiating'],
-  ['20000000-0000-4000-8000-000000000006', users[2].id, 'SQL for Data Analysis', 'Dữ liệu', 'Cathy Tanimura', 2021, 'used', 'borrowed'],
-  ['20000000-0000-4000-8000-000000000007', users[1].id, 'Tôi Thấy Hoa Vàng Trên Cỏ Xanh', 'Văn học', 'Nguyễn Nhật Ánh', 2018, 'good', 'exchanged'],
-  ['20000000-0000-4000-8000-000000000008', users[0].id, 'Designing Data-Intensive Applications', 'Hệ thống', 'Martin Kleppmann', 2020, 'good', 'available'],
+  ['20000000-0000-4000-8000-000000000001', users[2].id, 'Đắc Nhân Tâm', 'Kỹ năng', 'Dale Carnegie', 2021, 'good', 'negotiating', 'Tủ sách CLB - tầng 2 thư viện'],
+  ['20000000-0000-4000-8000-000000000002', users[1].id, 'Nhà Giả Kim', 'Tiểu thuyết', 'Paulo Coelho', 2020, 'used', 'borrowed', 'Sảnh nhà A'],
+  ['20000000-0000-4000-8000-000000000003', users[3].id, 'Clean Code', 'Lập trình', 'Robert C. Martin', 2019, 'good', 'available', 'Phòng lab 302'],
+  ['20000000-0000-4000-8000-000000000004', users[4].id, 'Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Truyền cảm hứng', 'Rosie Nguyễn', 2022, 'new', 'available', 'Quầy sinh viên tình nguyện'],
+  ['20000000-0000-4000-8000-000000000005', users[5].id, 'Atomic Habits', 'Kỹ năng', 'James Clear', 2023, 'good', 'negotiating', 'Ký túc xá B1'],
+  ['20000000-0000-4000-8000-000000000006', users[2].id, 'SQL for Data Analysis', 'Dữ liệu', 'Cathy Tanimura', 2021, 'used', 'borrowed', 'Phòng CLB sách'],
+  ['20000000-0000-4000-8000-000000000007', users[3].id, 'Tôi Thấy Hoa Vàng Trên Cỏ Xanh', 'Văn học', 'Nguyễn Nhật Ánh', 2018, 'good', 'exchanged', 'Sân sau nhà C'],
+  ['20000000-0000-4000-8000-000000000008', users[0].id, 'Designing Data-Intensive Applications', 'Hệ thống', 'Martin Kleppmann', 2020, 'good', 'available', 'Văn phòng khoa CNTT'],
+  ['20000000-0000-4000-8000-000000000009', users[1].id, 'Không Gia Đình', 'Văn học', 'Hector Malot', 2017, 'used', 'negotiating', 'Sảnh nhà A'],
 ]
 
 const transactions = [
@@ -85,30 +86,78 @@ const transactions = [
     type: 'exchange',
     method: 'volunteer',
     status: 'requested',
+    pickup: books[4][8],
+    dropoff: 'Sảnh nhà A',
     ownerConfirmed: null,
     borrowerConfirmed: null,
     pointsApplied: null,
   },
   {
     id: '30000000-0000-4000-8000-000000000002',
+    bookId: books[8][0],
+    ownerId: users[1].id,
+    borrowerId: users[5].id,
+    type: 'borrow',
+    method: 'volunteer',
+    status: 'accepted',
+    pickup: books[8][8],
+    dropoff: 'Khu tự học B1',
+    ownerConfirmed: now,
+    borrowerConfirmed: null,
+    pointsApplied: null,
+  },
+  {
+    id: '30000000-0000-4000-8000-000000000003',
+    bookId: books[0][0],
+    ownerId: users[2].id,
+    borrowerId: users[1].id,
+    type: 'borrow',
+    method: 'volunteer',
+    status: 'delivered',
+    pickup: books[0][8],
+    dropoff: 'Sảnh nhà A',
+    ownerConfirmed: now,
+    borrowerConfirmed: null,
+    pointsApplied: null,
+  },
+  {
+    id: '30000000-0000-4000-8000-000000000004',
     bookId: books[5][0],
     ownerId: users[2].id,
     borrowerId: users[3].id,
     type: 'borrow',
     method: 'volunteer',
     status: 'completed',
+    pickup: books[5][8],
+    dropoff: 'Phòng lab 302',
     ownerConfirmed: now,
     borrowerConfirmed: now,
     pointsApplied: now,
   },
   {
-    id: '30000000-0000-4000-8000-000000000003',
-    bookId: books[6][0],
+    id: '30000000-0000-4000-8000-000000000005',
+    bookId: books[1][0],
     ownerId: users[1].id,
+    borrowerId: users[2].id,
+    type: 'borrow',
+    method: 'volunteer',
+    status: 'return_requested',
+    pickup: books[1][8],
+    dropoff: 'Tủ sách CLB - tầng 2 thư viện',
+    ownerConfirmed: now,
+    borrowerConfirmed: now,
+    pointsApplied: now,
+  },
+  {
+    id: '30000000-0000-4000-8000-000000000006',
+    bookId: books[6][0],
+    ownerId: users[3].id,
     borrowerId: users[4].id,
     type: 'exchange',
     method: 'self_pickup',
     status: 'completed',
+    pickup: books[6][8],
+    dropoff: null,
     ownerConfirmed: now,
     borrowerConfirmed: now,
     pointsApplied: now,
@@ -116,16 +165,23 @@ const transactions = [
 ]
 
 const deliveries = [
-  ['40000000-0000-4000-8000-000000000001', transactions[0].id, 'outbound', null, null, null, 'Thư viện tầng 2', 'Sảnh nhà A', 'open', null],
-  ['40000000-0000-4000-8000-000000000002', transactions[1].id, 'outbound', users[4].id, now, now, 'Phòng CLB sách', 'Khu tự học B1', 'delivered', now],
+  ['40000000-0000-4000-8000-000000000001', transactions[1].id, 'outbound', null, null, null, transactions[1].pickup, transactions[1].dropoff, 'open', null],
+  ['40000000-0000-4000-8000-000000000002', transactions[2].id, 'outbound', users[4].id, now, now, transactions[2].pickup, transactions[2].dropoff, 'delivered', now],
+  ['40000000-0000-4000-8000-000000000003', transactions[3].id, 'outbound', users[4].id, now, now, transactions[3].pickup, transactions[3].dropoff, 'delivered', now],
+  ['40000000-0000-4000-8000-000000000004', transactions[4].id, 'outbound', users[4].id, now, now, transactions[4].pickup, transactions[4].dropoff, 'delivered', now],
+  ['40000000-0000-4000-8000-000000000005', transactions[4].id, 'return', null, null, null, 'Tủ sách CLB - tầng 2 thư viện', transactions[4].pickup, 'open', null],
 ]
 
 const ledger = [
-  ['60000000-0000-4000-8000-000000000001', users[1].id, transactions[2].id, null, 10, 30, 'Cộng điểm trao đổi vĩnh viễn'],
-  ['60000000-0000-4000-8000-000000000002', users[4].id, transactions[2].id, null, -10, 10, 'Trừ điểm nhận sách trao đổi'],
-  ['60000000-0000-4000-8000-000000000003', users[2].id, transactions[1].id, null, 5, 25, 'Cộng điểm cho mượn sách'],
-  ['60000000-0000-4000-8000-000000000004', users[3].id, transactions[1].id, null, -5, 15, 'Trừ điểm mượn sách'],
-  ['60000000-0000-4000-8000-000000000005', users[4].id, null, deliveries[1][0], 2, 12, 'Cộng điểm giao sách miễn phí'],
+  ['60000000-0000-4000-8000-000000000001', users[2].id, transactions[3].id, null, 5, 25, 'Cộng điểm cho mượn sách'],
+  ['60000000-0000-4000-8000-000000000002', users[3].id, transactions[3].id, null, -5, 15, 'Trừ điểm mượn sách'],
+  ['60000000-0000-4000-8000-000000000003', users[1].id, transactions[4].id, null, 5, 25, 'Cộng điểm cho mượn sách'],
+  ['60000000-0000-4000-8000-000000000004', users[2].id, transactions[4].id, null, -5, 20, 'Trừ điểm mượn sách'],
+  ['60000000-0000-4000-8000-000000000005', users[3].id, transactions[5].id, null, 10, 25, 'Cộng điểm trao đổi vĩnh viễn'],
+  ['60000000-0000-4000-8000-000000000006', users[4].id, transactions[5].id, null, -10, 10, 'Trừ điểm nhận sách trao đổi'],
+  ['60000000-0000-4000-8000-000000000007', users[4].id, null, deliveries[1][0], 2, 12, 'Cộng điểm giao sách miễn phí'],
+  ['60000000-0000-4000-8000-000000000008', users[4].id, null, deliveries[2][0], 2, 14, 'Cộng điểm giao sách miễn phí'],
+  ['60000000-0000-4000-8000-000000000009', users[4].id, null, deliveries[3][0], 2, 16, 'Cộng điểm giao sách miễn phí'],
 ]
 
 const transactionHistory = transactions.map((transaction, index) => [
@@ -263,6 +319,17 @@ try {
     )
   }
 
+  await client.query(`
+    truncate table
+      public.point_ledger,
+      public.transaction_history,
+      public.complaints,
+      public.deliveries,
+      public.book_transactions,
+      public.books
+    restart identity cascade
+  `)
+
   for (const book of books) {
     await client.query(
       `
@@ -274,9 +341,10 @@ try {
         author,
         publication_year,
         condition,
-        status
+        status,
+        pickup_location
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       on conflict (id) do update set
         owner_account_id = excluded.owner_account_id,
         title = excluded.title,
@@ -284,7 +352,8 @@ try {
         author = excluded.author,
         publication_year = excluded.publication_year,
         condition = excluded.condition,
-        status = excluded.status
+        status = excluded.status,
+        pickup_location = excluded.pickup_location
       `,
       book,
     )
@@ -301,6 +370,8 @@ try {
         transaction_type,
         delivery_method,
         status,
+        pickup_location,
+        dropoff_location,
         borrow_date,
         return_due_at,
         owner_confirmed_at,
@@ -309,11 +380,13 @@ try {
       )
       values (
         $1, $2, $3, $4, $5, $6, $7,
-        case when $5 = 'borrow' then now() else null end,
-        case when $5 = 'borrow' then now() + interval '21 days' else null end,
         $8,
         $9,
-        $10
+        case when $5 = 'borrow' and $7 in ('completed', 'return_requested', 'returned') then now() else null end,
+        case when $5 = 'borrow' then now() + interval '21 days' else null end,
+        $10,
+        $11,
+        $12
       )
       on conflict (id) do update set
         book_id = excluded.book_id,
@@ -322,6 +395,8 @@ try {
         transaction_type = excluded.transaction_type,
         delivery_method = excluded.delivery_method,
         status = excluded.status,
+        pickup_location = excluded.pickup_location,
+        dropoff_location = excluded.dropoff_location,
         borrow_date = excluded.borrow_date,
         return_due_at = excluded.return_due_at,
         owner_confirmed_at = excluded.owner_confirmed_at,
@@ -336,6 +411,8 @@ try {
         transaction.type,
         transaction.method,
         transaction.status,
+        transaction.pickup,
+        transaction.dropoff,
         transaction.ownerConfirmed,
         transaction.borrowerConfirmed,
         transaction.pointsApplied,
