@@ -116,8 +116,8 @@ const transactions = [
 ]
 
 const deliveries = [
-  ['40000000-0000-4000-8000-000000000001', transactions[0].id, null, null, null, 'Thư viện tầng 2', 'Sảnh nhà A', 'open', null],
-  ['40000000-0000-4000-8000-000000000002', transactions[1].id, users[4].id, now, now, 'Phòng CLB sách', 'Khu tự học B1', 'delivered', now],
+  ['40000000-0000-4000-8000-000000000001', transactions[0].id, 'outbound', null, null, null, 'Thư viện tầng 2', 'Sảnh nhà A', 'open', null],
+  ['40000000-0000-4000-8000-000000000002', transactions[1].id, 'outbound', users[4].id, now, now, 'Phòng CLB sách', 'Khu tự học B1', 'delivered', now],
 ]
 
 const ledger = [
@@ -385,6 +385,7 @@ try {
       insert into public.deliveries (
         id,
         transaction_id,
+        delivery_type,
         volunteer_account_id,
         accepted_at,
         delivered_at,
@@ -393,9 +394,10 @@ try {
         status,
         points_applied_at
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       on conflict (id) do update set
         transaction_id = excluded.transaction_id,
+        delivery_type = excluded.delivery_type,
         volunteer_account_id = excluded.volunteer_account_id,
         accepted_at = excluded.accepted_at,
         delivered_at = excluded.delivered_at,

@@ -5,6 +5,7 @@ import type {
   ComplaintStatus,
   DeliveryMethod,
   DeliveryStatus,
+  DeliveryType,
   TransactionStatus,
   TransactionType,
 } from './types'
@@ -26,8 +27,8 @@ export const bookStatusLabels: Record<BookStatus, string> = {
 }
 
 export const transactionTypeLabels: Record<TransactionType, string> = {
-  exchange: 'Trao đổi',
-  borrow: 'Cho mượn',
+  exchange: 'Trao đổi vĩnh viễn',
+  borrow: 'Mượn có hoàn trả',
 }
 
 export const transactionStatusLabels: Record<TransactionStatus, string> = {
@@ -38,6 +39,7 @@ export const transactionStatusLabels: Record<TransactionStatus, string> = {
   owner_confirmed: 'Chủ sách đã xác nhận',
   borrower_confirmed: 'Người nhận đã xác nhận',
   completed: 'Hoàn tất',
+  return_requested: 'Chờ hoàn trả',
   returned: 'Đã trả sách',
 }
 
@@ -52,6 +54,11 @@ export const deliveryStatusLabels: Record<DeliveryStatus, string> = {
   in_transit: 'Đang giao',
   delivered: 'Đã giao',
   cancelled: 'Đã hủy',
+}
+
+export const deliveryTypeLabels: Record<DeliveryType, string> = {
+  outbound: 'Lượt giao sách',
+  return: 'Lượt trả sách',
 }
 
 export const complaintStatusLabels: Record<ComplaintStatus, string> = {

@@ -37,6 +37,7 @@ import {
   conditionLabels,
   deliveryMethodLabels,
   deliveryStatusLabels,
+  deliveryTypeLabels,
   roleLabels,
   transactionStatusLabels,
   transactionTypeLabels,
@@ -79,6 +80,12 @@ type RequestForm = {
   dropoff_location: string
 }
 
+type ReturnForm = {
+  delivery_method: DeliveryMethod
+  pickup_location: string
+  dropoff_location: string
+}
+
 type ComplaintForm = {
   transaction_id: string
   reported_account_id: string
@@ -97,6 +104,12 @@ const emptyRequestForm: RequestForm = {
   transaction_type: 'exchange',
   delivery_method: 'self_pickup',
   return_due_at: '',
+  pickup_location: '',
+  dropoff_location: '',
+}
+
+const emptyReturnForm: ReturnForm = {
+  delivery_method: 'self_pickup',
   pickup_location: '',
   dropoff_location: '',
 }
@@ -151,8 +164,10 @@ function App() {
   const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all')
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [requestBookId, setRequestBookId] = useState<string | null>(null)
+  const [returnTransactionId, setReturnTransactionId] = useState<string | null>(null)
   const [bookForm, setBookForm] = useState<BookForm>(emptyBookForm)
   const [requestForm, setRequestForm] = useState<RequestForm>(emptyRequestForm)
+  const [returnForm, setReturnForm] = useState<ReturnForm>(emptyReturnForm)
   const [complaintForm, setComplaintForm] = useState<ComplaintForm>(emptyComplaintForm)
   const [profileForm, setProfileForm] = useState({ full_name: '', phone_number: '' })
   const [authForm, setAuthForm] = useState({
@@ -341,8 +356,14 @@ function App() {
     return new Map(books.map((item) => [item.id, item]))
   }, [books])
 
-  const deliveryByTransaction = useMemo(() => {
-    return new Map(deliveries.map((delivery) => [delivery.transaction_id, delivery]))
+  const deliveriesByTransaction = useMemo(() => {
+    const grouped = new Map<string, Delivery[]>()
+
+    for (const delivery of deliveries) {
+      grouped.set(delivery.transaction_id, [...(grouped.get(delivery.transaction_id) || []), delivery])
+    }
+
+    return grouped
   }, [deliveries])
 
   const categories = useMemo(() => {
@@ -386,10 +407,12 @@ function App() {
   }, [account, transactions])
 
   const activeTransactions = useMemo(() => {
-    return myTransactions.filter((transaction) =>
-      ['requested', 'accepted', 'owner_confirmed', 'borrower_confirmed', 'completed'].includes(
-        transaction.status,
-      ),
+    return myTransactions.filter(
+      (transaction) =>
+        ['requested', 'accepted', 'owner_confirmed', 'borrower_confirmed', 'return_requested'].includes(
+          transaction.status,
+        ) ||
+        (transaction.transaction_type === 'borrow' && transaction.status === 'completed'),
     )
   }, [myTransactions])
 
@@ -402,6 +425,9 @@ function App() {
   }, [account?.id, deliveries])
 
   const selectedRequestBook = requestBookId ? bookMap.get(requestBookId) : null
+  const selectedReturnTransaction = returnTransactionId
+    ? transactions.find((transaction) => transaction.id === returnTransactionId)
+    : null
 
   async function refreshData() {
     if (session?.user.id) {
@@ -625,8 +651,35 @@ function App() {
     })
   }
 
+  async function requestBookReturn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!selectedReturnTransaction) {
+      return
+    }
+
+    await runAction('return-request', 'Đã tạo yêu cầu hoàn trả sách.', async () => {
+      const { error } = await supabase.rpc('request_book_return', {
+        p_transaction_id: selectedReturnTransaction.id,
+        p_delivery_method: returnForm.delivery_method,
+        p_pickup_location:
+          returnForm.delivery_method === 'volunteer' ? returnForm.pickup_location.trim() || null : null,
+        p_dropoff_location:
+          returnForm.delivery_method === 'volunteer' ? returnForm.dropoff_location.trim() || null : null,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      setReturnTransactionId(null)
+      setReturnForm(emptyReturnForm)
+      setActiveView('transactions')
+    })
+  }
+
   async function markReturned(transactionId: string) {
-    await runAction(`return-${transactionId}`, 'Đã xác nhận trả sách.', async () => {
+    await runAction(`return-${transactionId}`, 'Đã xác nhận nhận lại sách và đóng giao dịch.', async () => {
       const { error } = await supabase.rpc('mark_book_returned', {
         p_transaction_id: transactionId,
       })
@@ -961,12 +1014,16 @@ function App() {
             transactions={myTransactions}
             accountMap={accountMap}
             bookMap={bookMap}
-            deliveries={deliveryByTransaction}
+            deliveries={deliveriesByTransaction}
             busyKey={busyKey}
             onAccept={(transaction) => respondTransaction(transaction.id, true)}
             onReject={(transaction) => respondTransaction(transaction.id, false)}
             onConfirm={(transaction) => confirmTransaction(transaction.id)}
-            onReturn={(transaction) => markReturned(transaction.id)}
+            onRequestReturn={(transaction) => {
+              setReturnTransactionId(transaction.id)
+              setReturnForm(emptyReturnForm)
+            }}
+            onConfirmReturn={(transaction) => markReturned(transaction.id)}
           />
         )}
 
@@ -1038,6 +1095,20 @@ function App() {
           onSubmit={createRequest}
         />
       )}
+
+      {selectedReturnTransaction && (
+        <ReturnDialog
+          transaction={selectedReturnTransaction}
+          book={bookMap.get(selectedReturnTransaction.book_id)}
+          owner={accountMap.get(selectedReturnTransaction.owner_account_id)}
+          borrower={accountMap.get(selectedReturnTransaction.borrower_account_id)}
+          form={returnForm}
+          busy={busyKey === 'return-request'}
+          onFormChange={setReturnForm}
+          onClose={() => setReturnTransactionId(null)}
+          onSubmit={requestBookReturn}
+        />
+      )}
     </main>
   )
 }
@@ -1073,6 +1144,7 @@ function DashboardView({
 
     return (
       (isOwner && transaction.status === 'requested') ||
+      (isOwner && transaction.status === 'return_requested') ||
       (isOwner && ['accepted', 'borrower_confirmed'].includes(transaction.status) && !transaction.owner_confirmed_at) ||
       (isBorrower && ['accepted', 'owner_confirmed'].includes(transaction.status) && !transaction.borrower_confirmed_at)
     )
@@ -1474,18 +1546,20 @@ function TransactionsView({
   onAccept,
   onReject,
   onConfirm,
-  onReturn,
+  onRequestReturn,
+  onConfirmReturn,
 }: {
   account: Account | null
   transactions: BookTransaction[]
   accountMap: Map<string, Account>
   bookMap: Map<string, Book>
-  deliveries: Map<string, Delivery>
+  deliveries: Map<string, Delivery[]>
   busyKey: string | null
   onAccept: (transaction: BookTransaction) => void
   onReject: (transaction: BookTransaction) => void
   onConfirm: (transaction: BookTransaction) => void
-  onReturn: (transaction: BookTransaction) => void
+  onRequestReturn: (transaction: BookTransaction) => void
+  onConfirmReturn: (transaction: BookTransaction) => void
 }) {
   return (
     <section className="entity-list">
@@ -1493,18 +1567,22 @@ function TransactionsView({
         const book = bookMap.get(transaction.book_id)
         const owner = accountMap.get(transaction.owner_account_id)
         const borrower = accountMap.get(transaction.borrower_account_id)
-        const delivery = deliveries.get(transaction.id)
+        const transactionDeliveries = deliveries.get(transaction.id) || []
         const isOwner = transaction.owner_account_id === account?.id
         const isBorrower = transaction.borrower_account_id === account?.id
+        const hasPendingReturnDelivery = transactionDeliveries.some(
+          (delivery) =>
+            delivery.delivery_type === 'return' && !['delivered', 'cancelled'].includes(delivery.status),
+        )
         const canConfirm =
           (isOwner || isBorrower) &&
           ['accepted', 'owner_confirmed', 'borrower_confirmed'].includes(transaction.status) &&
           ((isOwner && !transaction.owner_confirmed_at) ||
             (isBorrower && !transaction.borrower_confirmed_at))
-        const canReturn =
-          transaction.transaction_type === 'borrow' &&
-          transaction.status === 'completed' &&
-          (isOwner || isBorrower)
+        const canRequestReturn =
+          isBorrower && transaction.transaction_type === 'borrow' && transaction.status === 'completed'
+        const canConfirmReturn =
+          isOwner && transaction.transaction_type === 'borrow' && transaction.status === 'return_requested'
 
         return (
           <article className="entity-card" key={transaction.id}>
@@ -1540,10 +1618,16 @@ function TransactionsView({
                     <dd>{formatDate(transaction.created_at)}</dd>
                   </div>
                 </dl>
-                {delivery && (
-                  <div className="inline-note">
-                    <Truck size={16} />
-                    <span>{deliveryStatusLabels[delivery.status]}</span>
+                {transactionDeliveries.length > 0 && (
+                  <div className="delivery-stack">
+                    {transactionDeliveries.map((delivery) => (
+                      <div className="inline-note" key={delivery.id}>
+                        <Truck size={16} />
+                        <span>
+                          {deliveryTypeLabels[delivery.delivery_type]}: {deliveryStatusLabels[delivery.status]}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
                 <div className="next-step-note">
@@ -1584,15 +1668,28 @@ function TransactionsView({
                   Xác nhận
                 </ActionButton>
               )}
-              {canReturn && (
+              {canRequestReturn && (
+                <ActionButton
+                  type="button"
+                  icon={PackageCheck}
+                  variant="secondary"
+                  busy={busyKey === 'return-request'}
+                  onClick={() => onRequestReturn(transaction)}
+                >
+                  Yêu cầu trả
+                </ActionButton>
+              )}
+              {canConfirmReturn && (
                 <ActionButton
                   type="button"
                   icon={PackageCheck}
                   variant="secondary"
                   busy={busyKey === `return-${transaction.id}`}
-                  onClick={() => onReturn(transaction)}
+                  disabled={hasPendingReturnDelivery}
+                  title={hasPendingReturnDelivery ? 'Cần hoàn tất đơn giao trả trước.' : undefined}
+                  onClick={() => onConfirmReturn(transaction)}
                 >
-                  Đã trả
+                  {hasPendingReturnDelivery ? 'Chờ đơn giao trả' : 'Đã nhận lại'}
                 </ActionButton>
               )}
             </div>
@@ -1733,6 +1830,8 @@ function DeliveryList({
         const book = transaction ? bookMap.get(transaction.book_id) : null
         const owner = transaction ? accountMap.get(transaction.owner_account_id) : null
         const borrower = transaction ? accountMap.get(transaction.borrower_account_id) : null
+        const fromAccount = delivery.delivery_type === 'return' ? borrower : owner
+        const toAccount = delivery.delivery_type === 'return' ? owner : borrower
 
         return (
           <article className="entity-card" key={delivery.id}>
@@ -1746,9 +1845,13 @@ function DeliveryList({
                   <StatusPill status={delivery.status}>{deliveryStatusLabels[delivery.status]}</StatusPill>
                 </div>
                 <p>
-                  {owner?.full_name || 'Chủ sách'} → {borrower?.full_name || 'Người nhận'}
+                  {fromAccount?.full_name || 'Người giao'} → {toAccount?.full_name || 'Người nhận'}
                 </p>
                 <dl className="meta-grid">
+                  <div>
+                    <dt>Loại đơn</dt>
+                    <dd>{deliveryTypeLabels[delivery.delivery_type]}</dd>
+                  </div>
                   <div>
                     <dt>Nhận sách</dt>
                     <dd>{delivery.pickup_location}</dd>
@@ -2227,6 +2330,90 @@ function RequestDialog({
   )
 }
 
+function ReturnDialog({
+  transaction,
+  book,
+  owner,
+  borrower,
+  form,
+  busy,
+  onFormChange,
+  onClose,
+  onSubmit,
+}: {
+  transaction: BookTransaction
+  book?: Book
+  owner?: Account
+  borrower?: Account
+  form: ReturnForm
+  busy: boolean
+  onFormChange: (form: ReturnForm) => void
+  onClose: () => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  void transaction
+
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="return-title">
+        <div className="dialog-header">
+          <div>
+            <span className="eyebrow">Hoàn trả sách</span>
+            <h2 id="return-title">{book?.title || 'Sách đang mượn'}</h2>
+            <p>
+              {borrower?.full_name || 'Người mượn'} → {owner?.full_name || 'Chủ sách'}
+            </p>
+          </div>
+          <IconOnlyButton label="Đóng" onClick={onClose}>
+            <X size={18} />
+          </IconOnlyButton>
+        </div>
+
+        <form className="stack-form" onSubmit={onSubmit}>
+          <Field label="Cách hoàn trả">
+            <select
+              value={form.delivery_method}
+              onChange={(event) =>
+                onFormChange({ ...form, delivery_method: event.target.value as DeliveryMethod })
+              }
+            >
+              <option value="self_pickup">Tự gặp để trả sách</option>
+              <option value="volunteer">Nhờ người giao sách lượt về</option>
+            </select>
+          </Field>
+          {form.delivery_method === 'volunteer' && (
+            <>
+              <Field label="Điểm lấy sách trả">
+                <input
+                  required
+                  value={form.pickup_location}
+                  onChange={(event) => onFormChange({ ...form, pickup_location: event.target.value })}
+                  placeholder="Nơi người mượn bàn giao sách"
+                />
+              </Field>
+              <Field label="Điểm trả cho chủ sách">
+                <input
+                  required
+                  value={form.dropoff_location}
+                  onChange={(event) => onFormChange({ ...form, dropoff_location: event.target.value })}
+                  placeholder="Nơi chủ sách nhận lại sách"
+                />
+              </Field>
+            </>
+          )}
+          <div className="dialog-note">
+            <PackageCheck size={16} />
+            <span>Chỉ giao dịch mượn có hoàn trả mới có bước này; trao đổi vĩnh viễn sẽ kết thúc sau xác nhận giao sách.</span>
+          </div>
+          <ActionButton icon={PackageCheck} busy={busy}>
+            Tạo yêu cầu trả sách
+          </ActionButton>
+        </form>
+      </section>
+    </div>
+  )
+}
+
 function PanelHeader({
   icon: Icon,
   title,
@@ -2452,11 +2639,19 @@ function getTransactionActionText(transaction: BookTransaction, accountId?: stri
   }
 
   if (transaction.status === 'completed' && transaction.transaction_type === 'borrow') {
-    return 'Giao dịch mượn đang hiệu lực, có thể xác nhận trả sách khi hoàn tất.'
+    return isBorrower
+      ? 'Sách đang được mượn, bạn có thể tạo yêu cầu trả khi sẵn sàng.'
+      : 'Sách đang được mượn, chờ người mượn tạo yêu cầu hoàn trả.'
   }
 
   if (transaction.status === 'completed') {
-    return 'Giao dịch đã hoàn tất và điểm đã được cập nhật.'
+    return 'Trao đổi vĩnh viễn đã hoàn tất, không cần bước giao trả.'
+  }
+
+  if (transaction.status === 'return_requested') {
+    return isOwner
+      ? 'Chờ nhận lại sách rồi xác nhận hoàn trả để mở lại sách.'
+      : 'Đang chờ chủ sách xác nhận đã nhận lại sách.'
   }
 
   if (transaction.status === 'returned') {
@@ -2471,7 +2666,11 @@ function statusTone(status: string) {
     return 'good'
   }
 
-  if (['requested', 'negotiating', 'owner_confirmed', 'borrower_confirmed', 'open', 'reviewing'].includes(status)) {
+  if (
+    ['requested', 'negotiating', 'owner_confirmed', 'borrower_confirmed', 'return_requested', 'open', 'reviewing'].includes(
+      status,
+    )
+  ) {
     return 'waiting'
   }
 

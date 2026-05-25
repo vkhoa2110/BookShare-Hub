@@ -17,8 +17,10 @@ export type TransactionStatus =
   | 'owner_confirmed'
   | 'borrower_confirmed'
   | 'completed'
+  | 'return_requested'
   | 'returned'
 export type DeliveryStatus = 'open' | 'accepted' | 'in_transit' | 'delivered' | 'cancelled'
+export type DeliveryType = 'outbound' | 'return'
 export type ComplaintStatus = 'open' | 'reviewing' | 'resolved' | 'rejected'
 
 export type Account = {
@@ -76,6 +78,7 @@ export type TransactionHistory = {
 export type Delivery = {
   id: string
   transaction_id: string
+  delivery_type: DeliveryType
   volunteer_account_id: string | null
   accepted_at: string | null
   delivered_at: string | null

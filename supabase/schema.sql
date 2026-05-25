@@ -32,7 +32,7 @@ create table if not exists public.book_transactions (
   borrower_account_id uuid not null references public.accounts(id) on delete restrict,
   transaction_type text not null check (transaction_type in ('exchange', 'borrow')),
   delivery_method text not null default 'self_pickup' check (delivery_method in ('self_pickup', 'volunteer')),
-  status text not null default 'requested' check (status in ('requested', 'accepted', 'rejected', 'cancelled', 'owner_confirmed', 'borrower_confirmed', 'completed', 'returned')),
+  status text not null default 'requested' check (status in ('requested', 'accepted', 'rejected', 'cancelled', 'owner_confirmed', 'borrower_confirmed', 'completed', 'return_requested', 'returned')),
   borrow_date timestamptz,
   return_due_at timestamptz,
   actual_return_date_at timestamptz,
@@ -56,6 +56,7 @@ create table if not exists public.transaction_history (
 create table if not exists public.deliveries (
   id uuid primary key default gen_random_uuid(),
   transaction_id uuid not null references public.book_transactions(id) on delete cascade,
+  delivery_type text not null default 'outbound' check (delivery_type in ('outbound', 'return')),
   volunteer_account_id uuid references public.accounts(id) on delete set null,
   accepted_at timestamptz,
   delivered_at timestamptz,
@@ -99,6 +100,36 @@ create index if not exists transactions_owner_idx on public.book_transactions(ow
 create index if not exists transactions_borrower_idx on public.book_transactions(borrower_account_id);
 create index if not exists deliveries_status_idx on public.deliveries(status);
 create index if not exists point_ledger_account_idx on public.point_ledger(account_id, created_at desc);
+
+alter table public.deliveries
+add column if not exists delivery_type text not null default 'outbound';
+
+create index if not exists deliveries_transaction_type_idx on public.deliveries(transaction_id, delivery_type);
+
+do $$
+begin
+  alter table public.book_transactions
+    drop constraint if exists book_transactions_status_check;
+  alter table public.book_transactions
+    add constraint book_transactions_status_check
+    check (status in (
+      'requested',
+      'accepted',
+      'rejected',
+      'cancelled',
+      'owner_confirmed',
+      'borrower_confirmed',
+      'completed',
+      'return_requested',
+      'returned'
+    ));
+
+  alter table public.deliveries
+    drop constraint if exists deliveries_delivery_type_check;
+  alter table public.deliveries
+    add constraint deliveries_delivery_type_check
+    check (delivery_type in ('outbound', 'return'));
+end $$;
 
 create or replace function public.touch_updated_at()
 returns trigger
@@ -324,11 +355,13 @@ begin
   if p_delivery_method = 'volunteer' then
     insert into public.deliveries (
       transaction_id,
+      delivery_type,
       pickup_location,
       dropoff_location
     )
     values (
       v_transaction_id,
+      'outbound',
       coalesce(nullif(p_pickup_location, ''), 'Chưa cập nhật'),
       coalesce(nullif(p_dropoff_location, ''), 'Chưa cập nhật')
     );
@@ -515,7 +548,12 @@ begin
 end;
 $$;
 
-create or replace function public.mark_book_returned(p_transaction_id uuid)
+create or replace function public.request_book_return(
+  p_transaction_id uuid,
+  p_delivery_method text default 'self_pickup',
+  p_pickup_location text default null,
+  p_dropoff_location text default null
+)
 returns void
 language plpgsql
 security definer
@@ -533,12 +571,90 @@ begin
     raise exception 'Không tìm thấy giao dịch';
   end if;
 
-  if auth.uid() not in (v_transaction.owner_account_id, v_transaction.borrower_account_id) then
-    raise exception 'Bạn không thuộc giao dịch này';
+  if v_transaction.borrower_account_id <> auth.uid() then
+    raise exception 'Chỉ người mượn được tạo yêu cầu hoàn trả';
   end if;
 
   if v_transaction.transaction_type <> 'borrow' or v_transaction.status <> 'completed' then
-    raise exception 'Chỉ giao dịch mượn đã hoàn tất mới được trả sách';
+    raise exception 'Chỉ giao dịch mượn đang hiệu lực mới được yêu cầu hoàn trả';
+  end if;
+
+  if p_delivery_method not in ('self_pickup', 'volunteer') then
+    raise exception 'Hình thức hoàn trả không hợp lệ';
+  end if;
+
+  update public.book_transactions
+  set status = 'return_requested'
+  where id = p_transaction_id;
+
+  insert into public.transaction_history (
+    transaction_id,
+    status_updated_to,
+    updated_by_account_id,
+    note
+  )
+  values (
+    p_transaction_id,
+    'return_requested',
+    auth.uid(),
+    case when p_delivery_method = 'volunteer'
+      then 'Người mượn yêu cầu trả sách và cần người giao lượt về'
+      else 'Người mượn yêu cầu trả sách, hai bên tự giao nhận'
+    end
+  );
+
+  if p_delivery_method = 'volunteer' then
+    insert into public.deliveries (
+      transaction_id,
+      delivery_type,
+      pickup_location,
+      dropoff_location
+    )
+    values (
+      p_transaction_id,
+      'return',
+      coalesce(nullif(p_pickup_location, ''), 'Chưa cập nhật'),
+      coalesce(nullif(p_dropoff_location, ''), 'Chưa cập nhật')
+    );
+  end if;
+end;
+$$;
+
+create or replace function public.mark_book_returned(p_transaction_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_transaction public.book_transactions%rowtype;
+  v_pending_return_delivery_count integer;
+begin
+  select * into v_transaction
+  from public.book_transactions
+  where id = p_transaction_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy giao dịch';
+  end if;
+
+  if v_transaction.owner_account_id <> auth.uid() then
+    raise exception 'Chỉ chủ sách được xác nhận đã nhận lại sách';
+  end if;
+
+  if v_transaction.transaction_type <> 'borrow' or v_transaction.status <> 'return_requested' then
+    raise exception 'Chỉ giao dịch mượn đang chờ hoàn trả mới được đóng';
+  end if;
+
+  select count(*) into v_pending_return_delivery_count
+  from public.deliveries
+  where transaction_id = p_transaction_id
+    and delivery_type = 'return'
+    and status not in ('delivered', 'cancelled');
+
+  if v_pending_return_delivery_count > 0 then
+    raise exception 'Đơn giao trả chưa hoàn tất';
   end if;
 
   update public.book_transactions
@@ -560,7 +676,7 @@ begin
     p_transaction_id,
     'returned',
     auth.uid(),
-    'Xác nhận trả sách'
+    'Chủ sách xác nhận đã nhận lại sách'
   );
 end;
 $$;
@@ -783,6 +899,7 @@ revoke execute on function public.add_points(uuid, integer, text, uuid, uuid) fr
 revoke execute on function public.create_transaction_request(uuid, text, text, timestamptz, text, text) from public, anon;
 revoke execute on function public.respond_transaction(uuid, boolean, text) from public, anon;
 revoke execute on function public.confirm_transaction(uuid) from public, anon;
+revoke execute on function public.request_book_return(uuid, text, text, text) from public, anon;
 revoke execute on function public.mark_book_returned(uuid) from public, anon;
 revoke execute on function public.register_volunteer() from public, anon;
 revoke execute on function public.take_delivery(uuid) from public, anon;
@@ -799,6 +916,7 @@ grant update on public.complaints to authenticated;
 grant execute on function public.create_transaction_request(uuid, text, text, timestamptz, text, text) to authenticated;
 grant execute on function public.respond_transaction(uuid, boolean, text) to authenticated;
 grant execute on function public.confirm_transaction(uuid) to authenticated;
+grant execute on function public.request_book_return(uuid, text, text, text) to authenticated;
 grant execute on function public.mark_book_returned(uuid) to authenticated;
 grant execute on function public.register_volunteer() to authenticated;
 grant execute on function public.take_delivery(uuid) to authenticated;
