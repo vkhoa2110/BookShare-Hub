@@ -58,6 +58,39 @@ npm run dev
 Build kiểm tra:
 
 ```bash
+npm run check
 npm run build
+npm run test
 npm run lint
 ```
+
+## Cấu trúc mã nguồn
+
+Project được tách theo feature để dễ review và làm việc nhóm:
+
+```txt
+src/
+  app/                 # điều hướng và app-level config
+  features/            # từng màn hình nghiệp vụ: books, transactions, deliveries...
+  services/            # Supabase query/RPC/storage wrapper
+  shared/              # component, constants, utils dùng chung
+  styles/              # CSS layout/shared toàn app
+  types/               # domain types và form types
+```
+
+Quy ước khi thêm tính năng:
+
+- UI của màn hình đặt trong `src/features/<feature>/`.
+- Query/RPC Supabase đặt trong `src/services/`, không gọi trực tiếp từ component mới.
+- Component dùng lại đặt trong `src/shared/components/`.
+- Logic thuần có thể test đặt trong `src/shared/utils/` hoặc `src/features/<feature>/*Utils.ts`.
+- Chạy `npm run check` trước khi gửi code.
+
+Các script làm việc nhóm:
+
+- `npm run typecheck`: kiểm tra TypeScript.
+- `npm run lint`: kiểm tra ESLint.
+- `npm run format`: format bằng Prettier.
+- `npm run format:check`: kiểm tra format.
+- `npm run test`: chạy Vitest unit tests.
+- `npm run check`: chạy typecheck, lint, format check và test.
