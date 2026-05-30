@@ -53,3 +53,7 @@ export async function saveBook(accountId: string, form: BookForm, editingBookId:
 export async function updateBookStatus(bookId: string, status: BookStatus) {
   return supabase.from('books').update({ status }).eq('id', bookId)
 }
+
+export async function deleteBook(bookId: string) {
+  return supabase.from('books').delete().eq('id', bookId)
+}

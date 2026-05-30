@@ -6,6 +6,7 @@ export type View =
   | 'transactions'
   | 'deliveries'
   | 'complaints'
+  | 'notifications'
   | 'profile'
   | 'profile-info'
   | 'profile-addresses'
@@ -13,6 +14,10 @@ export type View =
   | 'profile-points'
   | 'profile-history'
   | 'admin'
+  | 'admin-overview'
+  | 'admin-members'
+  | 'admin-books'
+  | 'admin-complaints'
 export type Notice = { type: 'success' | 'error' | 'info'; text: string } | null
 export type AuthMode = 'signin' | 'signup'
 export type OwnershipFilter = 'all' | 'available' | 'mine'

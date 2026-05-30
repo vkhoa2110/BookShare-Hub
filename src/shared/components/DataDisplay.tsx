@@ -13,7 +13,7 @@ export function StatCard({
   icon: LucideIcon
   label: string
   value: string | number
-  tone: 'green' | 'blue' | 'amber' | 'neutral'
+  tone: 'green' | 'blue' | 'amber' | 'purple' | 'red' | 'neutral'
 }) {
   return (
     <article className={`stat-card ${tone}`}>

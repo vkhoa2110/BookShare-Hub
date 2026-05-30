@@ -10,7 +10,7 @@ import {
   Library,
   LogOut,
   MapPin,
-  Plus,
+  MessageSquareWarning,
   RefreshCw,
   UserRound,
   UserRoundPlus,
@@ -26,6 +26,7 @@ import { filterBooks } from '../features/books/bookUtils'
 import { ComplaintsView } from '../features/complaints/ComplaintsView'
 import { emptyComplaintForm } from '../features/complaints/complaintForms'
 import { DashboardView } from '../features/dashboard/DashboardView'
+import { NotificationsView } from '../features/notifications/NotificationsView'
 import { DeliveriesView } from '../features/deliveries/DeliveriesView'
 import { ProfileView } from '../features/profile/ProfileView'
 import { emptyAddressForm } from '../features/profile/addressForms'
@@ -51,13 +52,15 @@ import { addressIdForValue } from '../shared/utils/address'
 import { getErrorMessage } from '../shared/utils/errors'
 import { initials } from '../shared/utils/account'
 import {
+  adminDeleteAccount as adminDeleteAccountService,
+  adminUpdateAccount as adminUpdateAccountService,
   deleteAccountAddress,
   ensureAccountForSession,
   registerVolunteer as registerVolunteerAccount,
   saveAddress,
   updateAccountProfile,
 } from '../services/accountService'
-import { saveBook, updateBookStatus as saveBookStatus } from '../services/bookService'
+import { deleteBook as deleteBookService, saveBook, updateBookStatus as saveBookStatus } from '../services/bookService'
 import { createComplaint, updateComplaintStatus as saveComplaintStatus } from '../services/complaintService'
 import { takeDelivery as takeDeliveryOrder, updateDeliveryStatus } from '../services/deliveryService'
 import {
@@ -106,6 +109,7 @@ function App() {
   const [history, setHistory] = useState<TransactionHistory[]>([])
   const [activeView, setActiveView] = useState<View>('dashboard')
   const [isProfileExpanded, setIsProfileExpanded] = useState(false)
+  const [isAdminExpanded, setIsAdminExpanded] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [authMode, setAuthMode] = useState<AuthMode>('signin')
   const [loading, setLoading] = useState(true)
@@ -242,6 +246,11 @@ function App() {
       setIsProfileExpanded(true)
     } else {
       setIsProfileExpanded(false)
+    }
+    if (view.startsWith('admin')) {
+      setIsAdminExpanded(true)
+    } else {
+      setIsAdminExpanded(false)
     }
   }, [])
 
@@ -480,11 +489,7 @@ function App() {
     setBookForm(createBookForm(accountAddresses))
   }
 
-  function openBookCreate() {
-    resetBookForm()
-    handleViewChange('books')
-    setIsBookCreateOpen(true)
-  }
+
 
   function closeBookCreate() {
     setIsBookCreateOpen(false)
@@ -718,6 +723,50 @@ function App() {
     })
   }
 
+  async function handleDeleteBook(bookId: string) {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa cuốn sách này không? Hành động này không thể hoàn tác.')) {
+      return
+    }
+
+    await runAction(`book-delete-${bookId}`, 'Đã xóa sách thành công.', async () => {
+      const { error } = await deleteBookService(bookId)
+      if (error) {
+        throw new Error('Không thể xóa sách này vì đã có lịch sử giao dịch liên quan. Bạn có thể ẩn sách để thay thế.')
+      }
+    })
+  }
+
+  async function handleUpdateAccount(
+    accountId: string,
+    payload: {
+      full_name: string
+      phone_number: string | null
+      role: 'member' | 'volunteer' | 'admin'
+      points: number
+      status: boolean
+    }
+  ) {
+    return runAction(`account-update-${accountId}`, 'Đã cập nhật tài khoản thành công.', async () => {
+      const { error } = await adminUpdateAccountService(accountId, payload)
+      if (error) {
+        throw error
+      }
+    })
+  }
+
+  async function handleDeleteAccount(accountId: string) {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa thành viên này? Hành động này không thể hoàn tác.')) {
+      return
+    }
+
+    await runAction(`account-delete-${accountId}`, 'Đã xóa thành viên thành công.', async () => {
+      const { error } = await adminDeleteAccountService(accountId)
+      if (error) {
+        throw new Error('Không thể xóa thành viên này do ràng buộc khóa ngoại (ví dụ: đã có sách đăng ký hoặc lịch sử giao dịch gắn liền). Hãy khóa tài khoản để thay thế.')
+      }
+    })
+  }
+
   if (loading) {
     return (
       <main className="shell loading-shell">
@@ -832,6 +881,8 @@ function App() {
             .map((item) => {
               const isProfile = item.view === 'profile'
               const isProfileActive = activeView.startsWith('profile')
+              const isAdmin = item.view === 'admin'
+              const isAdminActive = activeView.startsWith('admin')
 
               if (isProfile) {
                 return (
@@ -907,6 +958,72 @@ function App() {
                 )
               }
 
+              if (isAdmin) {
+                return (
+                  <div key="admin-group" style={{ display: 'grid', gap: '4px' }}>
+                    <button
+                      type="button"
+                      className={isAdminActive ? 'active' : ''}
+                      onClick={() => {
+                        setIsAdminExpanded(!isAdminExpanded)
+                        if (!activeView.startsWith('admin')) {
+                          handleViewChange('admin-overview')
+                        }
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', width: '100%' }}
+                    >
+                      <item.icon size={18} />
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                      <ChevronDown
+                        size={16}
+                        style={{
+                          transform: isAdminExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s ease',
+                          opacity: 0.7,
+                        }}
+                      />
+                    </button>
+
+                    {isAdminExpanded && (
+                      <div className="sub-nav-list">
+                        <button
+                          type="button"
+                          className={activeView === 'admin-overview' || activeView === 'admin' ? 'active' : ''}
+                          onClick={() => handleViewChange('admin-overview')}
+                        >
+                          <Library size={16} />
+                          <span>Tổng quan</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={activeView === 'admin-members' ? 'active' : ''}
+                          onClick={() => handleViewChange('admin-members')}
+                        >
+                          <UserRound size={16} />
+                          <span>Thành viên</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={activeView === 'admin-books' ? 'active' : ''}
+                          onClick={() => handleViewChange('admin-books')}
+                        >
+                          <BookOpen size={16} />
+                          <span>Kho sách</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={activeView === 'admin-complaints' ? 'active' : ''}
+                          onClick={() => handleViewChange('admin-complaints')}
+                        >
+                          <MessageSquareWarning size={16} />
+                          <span>Khiếu nại</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
               return (
                 <button
                   key={item.view}
@@ -941,20 +1058,11 @@ function App() {
             <span className="eyebrow">{account ? roleLabels[account.role] : 'Thành viên'}</span>
             <h1>{pageTitle(activeView)}</h1>
           </div>
-          {activeView !== 'transactions' && (
-            <div className="topbar-actions">
-              <ActionButton type="button" icon={Plus} variant="secondary" onClick={openBookCreate}>
-                Thêm sách
-              </ActionButton>
-              <div className="score-pill">
-                <CircleDollarSign size={18} />
-                <span>{account?.points ?? 0} điểm</span>
-              </div>
-              <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
-                <RefreshCw size={18} />
-              </IconOnlyButton>
-            </div>
-          )}
+          <div className="topbar-actions">
+            <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
+              <RefreshCw size={18} />
+            </IconOnlyButton>
+          </div>
         </header>
 
         {!schemaReady && (
@@ -977,6 +1085,22 @@ function App() {
             ledger={ledger}
             accountMap={accountMap}
             bookMap={bookMap}
+            setActiveView={handleViewChange}
+          />
+        )}
+
+        {activeView === 'notifications' && (
+          <NotificationsView
+            account={account}
+            transactions={transactions}
+            deliveries={deliveries}
+            accountMap={accountMap}
+            bookMap={bookMap}
+            busyKey={busyKey}
+            onAccept={(transaction) => respondTransaction(transaction.id, true)}
+            onReject={(transaction) => respondTransaction(transaction.id, false)}
+            onConfirm={(transaction) => confirmTransaction(transaction.id)}
+            onConfirmReturn={(transaction) => markReturned(transaction.id)}
             setActiveView={handleViewChange}
           />
         )}
@@ -1085,8 +1209,9 @@ function App() {
           />
         )}
 
-        {activeView === 'admin' && account?.role === 'admin' && (
+        {activeView.startsWith('admin') && account?.role === 'admin' && (
           <AdminView
+            subView={activeView}
             accounts={accounts}
             books={books}
             transactions={transactions}
@@ -1095,6 +1220,11 @@ function App() {
             bookMap={bookMap}
             busyKey={busyKey}
             onUpdateComplaint={updateComplaintStatus}
+            onTabChange={handleViewChange}
+            onDeleteBook={handleDeleteBook}
+            onEditBook={startEditBook}
+            onUpdateAccount={handleUpdateAccount}
+            onDeleteAccount={handleDeleteAccount}
           />
         )}
       </section>

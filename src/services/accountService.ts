@@ -109,3 +109,20 @@ export type AccountData = {
   ledger: PointLedger[]
   history: TransactionHistory[]
 }
+
+export async function adminUpdateAccount(
+  accountId: string,
+  payload: {
+    full_name: string
+    phone_number: string | null
+    role: 'member' | 'volunteer' | 'admin'
+    points: number
+    status: boolean
+  }
+) {
+  return supabase.from('accounts').update(payload).eq('id', accountId)
+}
+
+export async function adminDeleteAccount(accountId: string) {
+  return supabase.from('accounts').delete().eq('id', accountId)
+}
