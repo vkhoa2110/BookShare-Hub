@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   ArrowRightLeft,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react'
 import { bookStatusLabels, conditionLabels } from '../../shared/constants/labels'
 import { ActionButton, EmptyState, PanelHeader, StatusPill } from '../../shared/components'
-import type { Account, AccountAddress, Book, BookStatus } from '../../types/domain'
+import type { Account, AccountAddress, Book } from '../../types/domain'
 import type { BookForm, OwnershipFilter } from '../../types/forms'
 import { BookFormBody } from './BookFormModal'
 import { BookCover } from './BookCover'
@@ -25,14 +26,12 @@ export function BooksView({
   categories,
   searchTerm,
   categoryFilter,
-  statusFilter,
   ownershipFilter,
   bookForm,
   editingBookId,
   busyKey,
   onSearch,
   onCategoryFilter,
-  onStatusFilter,
   onOwnershipFilter,
   onBookFormChange,
   onBookSubmit,
@@ -48,14 +47,12 @@ export function BooksView({
   categories: string[]
   searchTerm: string
   categoryFilter: string
-  statusFilter: string
   ownershipFilter: OwnershipFilter
   bookForm: BookForm
   editingBookId: string | null
   busyKey: string | null
   onSearch: (value: string) => void
   onCategoryFilter: (value: string) => void
-  onStatusFilter: (value: string) => void
   onOwnershipFilter: (value: OwnershipFilter) => void
   onBookFormChange: (value: BookForm) => void
   onBookSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -64,7 +61,18 @@ export function BooksView({
   onHideBook: (book: Book) => void
   onRequestBook: (book: Book) => void
 }) {
-  const availableBooks = books.filter((book) => book.status === 'available')
+  const [activeTab, setActiveTab] = useState<'available' | 'borrowed'>('available')
+
+  // Available books matching search, category, ownership
+  const availableBooks = books.filter(
+    (book) => book.status === 'available' || (book.status === 'hidden' && book.owner_account_id === account?.id)
+  )
+
+  // Borrowed books matching search, category, ownership
+  const borrowedBooks = books.filter((book) => book.status === 'borrowed')
+
+  // Selected books to display based on active tab
+  const displayBooks = activeTab === 'available' ? availableBooks : borrowedBooks
 
   return (
     <div className="view-stack books-view">
@@ -74,6 +82,24 @@ export function BooksView({
             <span className="eyebrow">Khám phá sách</span>
             <h2>Danh sách đang mở</h2>
           </div>
+        </div>
+
+        {/* Tabs chuyển đổi giữa Sách có sẵn và Sách đang cho mượn */}
+        <div className="books-tabs">
+          <button
+            className={`tab-button ${activeTab === 'available' ? 'active' : ''}`}
+            onClick={() => setActiveTab('available')}
+          >
+            <span className="tab-label">Sách có sẵn</span>
+            <span className="tab-count">{availableBooks.length}</span>
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'borrowed' ? 'active' : ''}`}
+            onClick={() => setActiveTab('borrowed')}
+          >
+            <span className="tab-label">Sách đang cho mượn</span>
+            <span className="tab-count">{borrowedBooks.length}</span>
+          </button>
         </div>
 
         <div className="toolbar books-toolbar">
@@ -93,18 +119,9 @@ export function BooksView({
               </option>
             ))}
           </select>
-          <select value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)}>
-            <option value="all">Tất cả trạng thái</option>
-            {(Object.keys(bookStatusLabels) as BookStatus[]).map((status) => (
-              <option key={status} value={status}>
-                {bookStatusLabels[status]}
-              </option>
-            ))}
-          </select>
-          <div className="filter-pills" aria-label="Lọc nhanh sách">
+          <div className="filter-pills two-columns" aria-label="Lọc nhanh sách">
             {[
               ['all', 'Tất cả'],
-              ['available', 'Có sẵn'],
               ['mine', 'Của tôi'],
             ].map(([value, label]) => (
               <button
@@ -120,8 +137,12 @@ export function BooksView({
         </div>
 
         <div className="quick-summary">
-          <span>{books.length} sách phù hợp</span>
-          <span>{availableBooks.length} sách có thể yêu cầu ngay</span>
+          <span>{displayBooks.length} sách phù hợp</span>
+          {activeTab === 'available' && (
+            <span>
+              {availableBooks.filter((b) => b.status === 'available' && b.owner_account_id !== account?.id).length} sách có thể yêu cầu ngay
+            </span>
+          )}
         </div>
       </section>
 
@@ -146,13 +167,17 @@ export function BooksView({
         <div className="books-section-header">
           <div>
             <span className="eyebrow">Danh sách sách</span>
-            <h2>{books.length} sách phù hợp</h2>
+            <h2>{displayBooks.length} sách phù hợp</h2>
           </div>
-          <span>{availableBooks.length} có sẵn</span>
+          <span>
+            {activeTab === 'available'
+              ? `${availableBooks.filter((b) => b.status === 'available').length} có sẵn`
+              : `${borrowedBooks.length} đang cho mượn`}
+          </span>
         </div>
 
         <div className="book-grid">
-          {books.map((book) => {
+          {displayBooks.map((book) => {
             const owner = accountMap.get(book.owner_account_id)
             const isMine = book.owner_account_id === account?.id
             const canRequest = !isMine && book.status === 'available'
@@ -228,7 +253,7 @@ export function BooksView({
               </article>
             )
           })}
-          {books.length === 0 && <EmptyState icon={BookOpen} text="Không có sách phù hợp." />}
+          {displayBooks.length === 0 && <EmptyState icon={BookOpen} text="Không có sách phù hợp." />}
         </div>
       </section>
     </div>

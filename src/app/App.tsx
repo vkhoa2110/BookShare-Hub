@@ -114,7 +114,6 @@ function App() {
   const [schemaReady, setSchemaReady] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all')
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [isBookCreateOpen, setIsBookCreateOpen] = useState(false)
@@ -275,10 +274,10 @@ function App() {
       account,
       searchTerm,
       categoryFilter,
-      statusFilter,
+      statusFilter: 'all',
       ownershipFilter,
     })
-  }, [account, books, categoryFilter, ownershipFilter, searchTerm, statusFilter])
+  }, [account, books, categoryFilter, ownershipFilter, searchTerm])
 
   const myTransactions = useMemo(() => {
     if (!account) {
@@ -990,14 +989,12 @@ function App() {
             categories={categories}
             searchTerm={searchTerm}
             categoryFilter={categoryFilter}
-            statusFilter={statusFilter}
             ownershipFilter={ownershipFilter}
             bookForm={bookForm}
             editingBookId={editingBookId}
             busyKey={busyKey}
             onSearch={setSearchTerm}
             onCategoryFilter={setCategoryFilter}
-            onStatusFilter={setStatusFilter}
             onOwnershipFilter={setOwnershipFilter}
             onBookFormChange={setBookForm}
             onBookSubmit={handleBookSubmit}
