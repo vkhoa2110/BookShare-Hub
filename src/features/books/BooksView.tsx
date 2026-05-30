@@ -1,152 +1,373 @@
-import type { FormEvent } from 'react'
+import { useMemo, useState } from 'react'
+import type { FormEvent, KeyboardEvent } from 'react'
 import {
   ArrowRightLeft,
   BookOpen,
+  Calendar,
   Check,
   EyeOff,
-  Library,
-  Mail,
+  ListFilter,
   MapPin,
   Pencil,
-  Phone,
+  Plus,
   Search,
+  Tag,
+  UserRound,
+  X,
 } from 'lucide-react'
 import { bookStatusLabels, conditionLabels } from '../../shared/constants/labels'
-import { ActionButton, EmptyState, PanelHeader, StatusPill } from '../../shared/components'
-import type { Account, AccountAddress, Book, BookStatus, BookTransaction } from '../../types/domain'
-import type { BookForm, OwnershipFilter } from '../../types/forms'
+import { ActionButton, EmptyState, IconOnlyButton, PanelHeader, StatusPill } from '../../shared/components'
+import type { Account, AccountAddress, Book } from '../../types/domain'
+import type { BookForm } from '../../types/forms'
 import { BookFormBody } from './BookFormModal'
-import { BookCover, MiniBookItem } from './BookCover'
+import { BookCover } from './BookCover'
+import { filterBooks, normalizeBookSearchText } from './bookUtils'
+
+type BookScope = 'all' | 'available' | 'borrowed'
+type BookSort = 'relevance' | 'newest' | 'title'
+
+function getBookTime(book: Book) {
+  const time = Date.parse(book.created_at)
+  return Number.isNaN(time) ? 0 : time
+}
+
+function rankBook(book: Book, searchTerm: string) {
+  const term = normalizeBookSearchText(searchTerm.trim())
+
+  if (!term) {
+    return 0
+  }
+
+  const title = normalizeBookSearchText(book.title)
+  const author = normalizeBookSearchText(book.author)
+  const category = normalizeBookSearchText(book.category)
+
+  if (title === term) return 0
+  if (title.startsWith(term)) return 1
+  if (author.startsWith(term)) return 2
+  if (title.includes(term)) return 3
+  if (author.includes(term)) return 4
+  if (category.includes(term)) return 5
+  return 6
+}
+
+function BookDetailDialog({
+  account,
+  book,
+  owner,
+  onClose,
+  onEditBook,
+  onHideBook,
+  onRequestBook,
+}: {
+  account: Account | null
+  book: Book
+  owner?: Account
+  onClose: () => void
+  onEditBook: (book: Book) => void
+  onHideBook: (book: Book) => void
+  onRequestBook: (book: Book) => void
+}) {
+  const isMine = book.owner_account_id === account?.id
+  const canRequest = !isMine && book.status === 'available'
+
+  function closeThen(action: (book: Book) => void) {
+    onClose()
+    action(book)
+  }
+
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section
+        className="dialog book-detail-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="book-detail-title"
+      >
+        <div className="dialog-header book-detail-header">
+          <div>
+            <h2 id="book-detail-title">Chi tiết sách</h2>
+          </div>
+          <IconOnlyButton label="Đóng" onClick={onClose}>
+            <X size={18} />
+          </IconOnlyButton>
+        </div>
+
+        <div className="book-detail-layout">
+          <div className="book-detail-cover-wrap">
+            <BookCover book={book} />
+            <StatusPill status={book.status}>{bookStatusLabels[book.status]}</StatusPill>
+          </div>
+
+          <div className="book-detail-content">
+            <div className="book-detail-title-block">
+              <span>{book.category}</span>
+              <h3>{book.title}</h3>
+              <p>{book.author}</p>
+            </div>
+
+            <dl className="book-detail-grid">
+              <div>
+                <dt>
+                  <UserRound size={15} />
+                  Chủ sách
+                </dt>
+                <dd>{owner?.full_name || 'Thành viên'}</dd>
+              </div>
+              <div>
+                <dt>
+                  <BookOpen size={15} />
+                  Tình trạng
+                </dt>
+                <dd>{conditionLabels[book.condition]}</dd>
+              </div>
+              <div>
+                <dt>
+                  <Calendar size={15} />
+                  Năm xuất bản
+                </dt>
+                <dd>{book.publication_year || 'Chưa rõ'}</dd>
+              </div>
+              <div>
+                <dt>
+                  <Tag size={15} />
+                  Thể loại
+                </dt>
+                <dd>{book.category}</dd>
+              </div>
+              <div className="book-detail-address">
+                <dt>
+                  <MapPin size={15} />
+                  Địa chỉ lấy sách
+                </dt>
+                <dd>{book.pickup_location || 'Chưa cập nhật'}</dd>
+              </div>
+            </dl>
+
+            <div className="book-detail-actions">
+              {canRequest && (
+                <ActionButton type="button" icon={ArrowRightLeft} onClick={() => closeThen(onRequestBook)}>
+                  Yêu cầu mượn
+                </ActionButton>
+              )}
+              {isMine && (
+                <ActionButton type="button" icon={Pencil} onClick={() => closeThen(onEditBook)}>
+                  Sửa
+                </ActionButton>
+              )}
+              {isMine && ['available', 'hidden'].includes(book.status) && (
+                <ActionButton
+                  type="button"
+                  icon={EyeOff}
+                  variant="secondary"
+                  onClick={() => closeThen(onHideBook)}
+                >
+                  {book.status === 'hidden' ? 'Hiện sách' : 'Ẩn sách'}
+                </ActionButton>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
 
 export function BooksView({
   account,
   accountMap,
   books,
-  allBooks,
-  transactions,
   addressOptions,
   categories,
   searchTerm,
   categoryFilter,
-  statusFilter,
-  ownershipFilter,
   bookForm,
   editingBookId,
   busyKey,
   onSearch,
   onCategoryFilter,
-  onStatusFilter,
-  onOwnershipFilter,
   onBookFormChange,
   onBookSubmit,
   onResetBookForm,
   onEditBook,
   onHideBook,
   onRequestBook,
+  onOpenBookCreate,
 }: {
   account: Account | null
   accountMap: Map<string, Account>
   books: Book[]
-  allBooks: Book[]
-  transactions: BookTransaction[]
   addressOptions: AccountAddress[]
   categories: string[]
   searchTerm: string
   categoryFilter: string
-  statusFilter: string
-  ownershipFilter: OwnershipFilter
   bookForm: BookForm
   editingBookId: string | null
   busyKey: string | null
   onSearch: (value: string) => void
   onCategoryFilter: (value: string) => void
-  onStatusFilter: (value: string) => void
-  onOwnershipFilter: (value: OwnershipFilter) => void
   onBookFormChange: (value: BookForm) => void
   onBookSubmit: (event: FormEvent<HTMLFormElement>) => void
   onResetBookForm: () => void
   onEditBook: (book: Book) => void
   onHideBook: (book: Book) => void
   onRequestBook: (book: Book) => void
+  onOpenBookCreate: () => void
 }) {
-  const ownedBooks = allBooks.filter((book) => book.owner_account_id === account?.id)
-  const borrowedBooks = transactions
-    .filter(
-      (transaction) =>
-        transaction.borrower_account_id === account?.id &&
-        transaction.transaction_type === 'borrow' &&
-        ['completed', 'return_requested'].includes(transaction.status),
-    )
-    .map((transaction) => ({
-      transaction,
-      book: allBooks.find((book) => book.id === transaction.book_id),
-    }))
-    .filter((item): item is { transaction: BookTransaction; book: Book } => {
-      const book = item.book
-      if (!book) {
-        return false
+  const [bookScope, setBookScope] = useState<BookScope>('all')
+  const [sortOrder, setSortOrder] = useState<BookSort>('relevance')
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+
+  const baseFilteredBooks = useMemo(
+    () =>
+      filterBooks({
+        books,
+        account,
+        searchTerm,
+        categoryFilter,
+        statusFilter: 'all',
+        ownershipFilter: 'all',
+      }).filter((book) => book.status !== 'exchanged' && book.owner_account_id !== account?.id),
+    [account, books, categoryFilter, searchTerm],
+  )
+
+  const scopedBooks = useMemo(() => {
+    if (bookScope === 'available') {
+      return baseFilteredBooks.filter((book) => book.status === 'available')
+    }
+
+    if (bookScope === 'borrowed') {
+      return baseFilteredBooks.filter((book) => book.status === 'borrowed')
+    }
+
+    return baseFilteredBooks
+  }, [baseFilteredBooks, bookScope])
+
+  const displayBooks = useMemo(() => {
+    const sortedBooks = [...scopedBooks]
+
+    if (sortOrder === 'title') {
+      return sortedBooks.sort((firstBook, secondBook) =>
+        firstBook.title.localeCompare(secondBook.title, 'vi'),
+      )
+    }
+
+    if (sortOrder === 'newest') {
+      return sortedBooks.sort((firstBook, secondBook) => getBookTime(secondBook) - getBookTime(firstBook))
+    }
+
+    return sortedBooks.sort((firstBook, secondBook) => {
+      const rankDelta = rankBook(firstBook, searchTerm) - rankBook(secondBook, searchTerm)
+
+      if (rankDelta !== 0) {
+        return rankDelta
       }
 
-      return book.status === 'borrowed'
+      return getBookTime(secondBook) - getBookTime(firstBook)
     })
-  const availableBooks = books.filter((book) => book.status === 'available')
+  }, [scopedBooks, searchTerm, sortOrder])
+
+  const normalizedSearchTerm = searchTerm.trim()
+
+  const scopeOptions: Array<{ value: BookScope; label: string }> = [
+    { value: 'all', label: 'Tất cả' },
+    { value: 'available', label: 'Có sẵn' },
+    { value: 'borrowed', label: 'Đang mượn' },
+  ]
+
+  function openBookDetailFromKeyboard(event: KeyboardEvent<HTMLElement>, book: Book) {
+    if (event.target !== event.currentTarget) {
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      setSelectedBook(book)
+    }
+  }
 
   return (
     <div className="view-stack books-view">
-      <section className="books-controls">
-        <div className="books-controls-header">
-          <div>
-            <span className="eyebrow">Khám phá sách</span>
-            <h2>Danh sách đang mở</h2>
+      <section className="books-controls search-first-controls" role="search" aria-label="Tìm sách trong kho">
+        <div className="book-search-primary-row">
+          <div className="book-search-main">
+            <label className="book-category-control">
+              <select
+                aria-label="Lọc theo thể loại"
+                value={categoryFilter}
+                onChange={(event) => onCategoryFilter(event.target.value)}
+              >
+                <option value="all">Tất cả thể loại</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="book-search-field">
+              <Search size={20} />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => onSearch(event.target.value)}
+                placeholder="Tên sách, tác giả, thể loại, địa điểm..."
+                aria-label="Tìm theo tên sách, tác giả, thể loại hoặc địa điểm"
+              />
+            </div>
+
+            {normalizedSearchTerm && (
+              <button
+                type="button"
+                className="book-search-clear"
+                onClick={() => onSearch('')}
+                aria-label="Xóa tìm kiếm"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
+
+          <ActionButton
+            type="button"
+            icon={Plus}
+            variant="primary"
+            onClick={onOpenBookCreate}
+            className="book-add-button"
+          >
+            Thêm sách
+          </ActionButton>
         </div>
 
-        <div className="toolbar books-toolbar">
-          <div className="search-box">
-            <Search size={18} />
-            <input
-              value={searchTerm}
-              onChange={(event) => onSearch(event.target.value)}
-              placeholder="Tìm tên sách, tác giả, thể loại"
-            />
-          </div>
-          <select value={categoryFilter} onChange={(event) => onCategoryFilter(event.target.value)}>
-            <option value="all">Tất cả thể loại</option>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-          <select value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)}>
-            <option value="all">Tất cả trạng thái</option>
-            {(Object.keys(bookStatusLabels) as BookStatus[]).map((status) => (
-              <option key={status} value={status}>
-                {bookStatusLabels[status]}
-              </option>
-            ))}
-          </select>
-          <div className="filter-pills" aria-label="Lọc nhanh sách">
-            {[
-              ['all', 'Tất cả'],
-              ['available', 'Có sẵn'],
-              ['mine', 'Của tôi'],
-            ].map(([value, label]) => (
+        <div className="book-search-panel-footer">
+          <div className="book-scope-pills" aria-label="Lọc nhanh sách">
+            {scopeOptions.map((option) => (
               <button
-                key={value}
+                key={option.value}
                 type="button"
-                className={ownershipFilter === value ? 'filter-chip active' : 'filter-chip'}
-                onClick={() => onOwnershipFilter(value as OwnershipFilter)}
+                className={bookScope === option.value ? 'active' : ''}
+                onClick={() => setBookScope(option.value)}
               >
-                {label}
+                <span>{option.label}</span>
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="quick-summary">
-          <span>{books.length} sách phù hợp</span>
-          <span>{availableBooks.length} sách có thể yêu cầu ngay</span>
+          <div className="book-search-tools">
+            <label className="book-sort-control">
+              <ListFilter size={16} />
+              <select
+                aria-label="Sắp xếp sách"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value as BookSort)}
+              >
+                <option value="relevance">Phù hợp nhất</option>
+                <option value="newest">Mới nhất</option>
+                <option value="title">Tên A-Z</option>
+              </select>
+            </label>
+          </div>
         </div>
       </section>
 
@@ -167,131 +388,69 @@ export function BooksView({
         </section>
       )}
 
-      <div className="books-market-layout">
-        <section className="books-results">
-          <div className="books-section-header">
-            <div>
-              <span className="eyebrow">Danh sách sách</span>
-              <h2>{books.length} sách phù hợp</h2>
-            </div>
-            <span>{availableBooks.length} có sẵn</span>
+      <section className="books-results">
+        <div className="books-section-header books-results-header">
+          <div>
+            <span className="eyebrow">Kết quả</span>
+            <h2>{displayBooks.length} sách phù hợp</h2>
           </div>
+          <span>{categoryFilter === 'all' ? 'Tất cả thể loại' : categoryFilter}</span>
+        </div>
 
-          <div className="book-grid">
-            {books.map((book) => {
-              const owner = accountMap.get(book.owner_account_id)
-              const isMine = book.owner_account_id === account?.id
-              const canRequest = !isMine && book.status === 'available'
-
-              return (
-                <article className="book-card" key={book.id}>
+        <div className="book-grid">
+          {displayBooks.map((book) => {
+            return (
+              <article
+                className="book-card"
+                key={book.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Xem chi tiết ${book.title}`}
+                onClick={() => setSelectedBook(book)}
+                onKeyDown={(event) => openBookDetailFromKeyboard(event, book)}
+              >
+                <div className="book-card-cover-wrap">
                   <BookCover book={book} />
-                  <div className="book-card-body">
-                    <div className="card-title-row">
-                      <div>
-                        <span className="book-category-tag">{book.category}</span>
-                        <h2>{book.title}</h2>
-                        <p>{book.author}</p>
-                      </div>
-                      <StatusPill status={book.status}>{bookStatusLabels[book.status]}</StatusPill>
-                    </div>
-                    <dl className="meta-grid book-meta-grid">
-                      <div>
-                        <dt>Chủ sách</dt>
-                        <dd>{owner?.full_name || 'Thành viên'}</dd>
-                      </div>
-                      <div>
-                        <dt>Tình trạng</dt>
-                        <dd>{conditionLabels[book.condition]}</dd>
-                      </div>
-                      <div>
-                        <dt>Năm</dt>
-                        <dd>{book.publication_year || 'Chưa rõ'}</dd>
-                      </div>
-                    </dl>
-                    <div className="contact-strip">
-                      <span>
-                        <MapPin size={14} />
-                        {book.pickup_location || 'Chưa cập nhật'}
-                      </span>
-                      <span>
-                        <Mail size={14} />
-                        {owner?.email_address || 'Chưa có email'}
-                      </span>
-                      <span>
-                        <Phone size={14} />
-                        {owner?.phone_number || 'Chưa có số điện thoại'}
-                      </span>
-                    </div>
-                    <div className="card-actions">
-                      {isMine && (
-                        <ActionButton
-                          type="button"
-                          icon={Pencil}
-                          variant="secondary"
-                          onClick={() => onEditBook(book)}
-                        >
-                          Sửa
-                        </ActionButton>
-                      )}
-                      {isMine && ['available', 'hidden'].includes(book.status) && (
-                        <ActionButton
-                          type="button"
-                          icon={EyeOff}
-                          variant="secondary"
-                          onClick={() => onHideBook(book)}
-                        >
-                          {book.status === 'hidden' ? 'Hiện' : 'Ẩn'}
-                        </ActionButton>
-                      )}
-                      {canRequest && (
-                        <ActionButton type="button" icon={ArrowRightLeft} onClick={() => onRequestBook(book)}>
-                          Yêu cầu
-                        </ActionButton>
-                      )}
-                    </div>
+                  <StatusPill status={book.status}>{bookStatusLabels[book.status]}</StatusPill>
+                  <span className="book-condition-tag">{conditionLabels[book.condition]}</span>
+                </div>
+                <div className="book-card-body">
+                  <div className="book-card-title-block">
+                    <h2>{book.title}</h2>
+                    <p>
+                      {book.author} · {book.category}
+                    </p>
                   </div>
-                </article>
-              )
-            })}
-            {books.length === 0 && <EmptyState icon={BookOpen} text="Không có sách phù hợp." />}
-          </div>
-        </section>
 
-        <aside className="tool-panel my-books-panel">
-          <PanelHeader icon={Library} title="Sách của tôi" />
-          <div className="my-books-board">
-            <div>
-              <div className="mini-section-title">
-                <h3>Đã đăng</h3>
-                <span>{ownedBooks.length}</span>
-              </div>
-              <div className="mini-book-list">
-                {ownedBooks.slice(0, 6).map((book) => (
-                  <MiniBookItem key={book.id} book={book} detail={bookStatusLabels[book.status]} />
-                ))}
-                {ownedBooks.length === 0 && <EmptyState icon={BookOpen} text="Chưa đăng sách." />}
-              </div>
+                  <div className="book-card-meta" aria-label="Thông tin tóm tắt">
+                    <span className="book-card-address">
+                      <MapPin size={14} />
+                      <span>{book.pickup_location || 'Chưa cập nhật'}</span>
+                    </span>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+          {displayBooks.length === 0 && (
+            <div className="books-empty-state">
+              <EmptyState icon={BookOpen} text="Không có sách phù hợp." />
             </div>
-            <div>
-              <div className="mini-section-title">
-                <h3>Đang mượn</h3>
-                <span>{borrowedBooks.length}</span>
-              </div>
-              <div className="mini-book-list">
-                {borrowedBooks.slice(0, 6).map(({ book, transaction }) => (
-                  <MiniBookItem
-                    key={transaction.id}
-                    book={book}
-                    detail={transaction.status === 'return_requested' ? 'Đang trả sách' : 'Đang mượn'}
-                  />
-                ))}
-                {borrowedBooks.length === 0 && <EmptyState icon={BookOpen} text="Chưa có sách đang mượn." />}
-              </div>
-            </div>
-          </div>
-        </aside>
-      </div>
+          )}
+        </div>
+      </section>
+
+      {selectedBook && (
+        <BookDetailDialog
+          account={account}
+          book={selectedBook}
+          owner={accountMap.get(selectedBook.owner_account_id)}
+          onClose={() => setSelectedBook(null)}
+          onEditBook={onEditBook}
+          onHideBook={onHideBook}
+          onRequestBook={onRequestBook}
+        />
+      )}
     </div>
   )
 }

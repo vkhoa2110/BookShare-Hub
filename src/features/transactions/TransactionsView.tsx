@@ -1,16 +1,85 @@
-import { ArrowRightLeft, Check, Clock3, PackageCheck, Truck, X } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRightLeft, ChevronRight, Search } from 'lucide-react'
 import {
-  deliveryStatusLabels,
-  deliveryTypeLabels,
   deliveryMethodLabels,
   transactionStatusLabels,
   transactionTypeLabels,
 } from '../../shared/constants/labels'
-import { pointRule } from '../../shared/constants/rules'
-import { ActionButton, EmptyState, StatusPill } from '../../shared/components'
-import { formatDate } from '../../shared/utils/date'
-import { getTransactionActionText } from '../../shared/utils/status'
+import { EmptyState, StatusPill } from '../../shared/components'
 import type { Account, Book, BookTransaction, Delivery } from '../../types/domain'
+import { TransactionDetailDialog } from './TransactionDetailDialog'
+import './transactions.css'
+
+type TabType = 'given' | 'borrowed'
+
+function TransactionTable({
+  transactions,
+  accountMap,
+  tab,
+  onSelectTransaction,
+}: {
+  transactions: BookTransaction[]
+  accountMap: Map<string, Account>
+  tab: TabType
+  onSelectTransaction: (id: string) => void
+}) {
+  if (transactions.length === 0) {
+    return <EmptyState icon={ArrowRightLeft} text="Chưa có giao dịch." />
+  }
+
+  return (
+    <div className="table-wrapper">
+      <table className="transactions-table">
+        <thead>
+          <tr>
+            <th>Mã giao dịch</th>
+            {tab === 'given' ? (
+              <th>Người mượn sách</th>
+            ) : (
+              <th>Chủ sở hữu</th>
+            )}
+            <th>Loại giao dịch</th>
+            <th>Giao nhận</th>
+            <th>Trạng thái</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {transactions.map((transaction) => {
+            const owner = accountMap.get(transaction.owner_account_id)
+            const borrower = accountMap.get(transaction.borrower_account_id)
+            const displayName = tab === 'given' ? borrower?.full_name : owner?.full_name
+
+            return (
+              <tr key={transaction.id} className="transaction-row">
+                <td className="cell-id">
+                  <code className="transaction-id">{transaction.id}</code>
+                </td>
+                <td className="cell-name">{displayName || (tab === 'given' ? 'Người nhận' : 'Chủ sách')}</td>
+                <td className="cell-type">{transactionTypeLabels[transaction.transaction_type]}</td>
+                <td className="cell-method">{deliveryMethodLabels[transaction.delivery_method]}</td>
+                <td className="cell-status">
+                  <StatusPill status={transaction.status}>
+                    {transactionStatusLabels[transaction.status]}
+                  </StatusPill>
+                </td>
+                <td className="cell-detail">
+                  <button
+                    className="detail-button"
+                    onClick={() => onSelectTransaction(transaction.id)}
+                    title="Xem chi tiết"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 export function TransactionsView({
   account,
@@ -37,162 +106,316 @@ export function TransactionsView({
   onRequestReturn: (transaction: BookTransaction) => void
   onConfirmReturn: (transaction: BookTransaction) => void
 }) {
-  return (
-    <section className="entity-list">
-      {transactions.map((transaction) => {
-        const book = bookMap.get(transaction.book_id)
-        const owner = accountMap.get(transaction.owner_account_id)
-        const borrower = accountMap.get(transaction.borrower_account_id)
-        const transactionDeliveries = deliveries.get(transaction.id) || []
-        const isOwner = transaction.owner_account_id === account?.id
-        const isBorrower = transaction.borrower_account_id === account?.id
-        const outboundDeliveries = transactionDeliveries.filter(
-          (delivery) => delivery.delivery_type === 'outbound',
-        )
-        const hasPendingReturnDelivery = transactionDeliveries.some(
-          (delivery) =>
-            delivery.delivery_type === 'return' && !['delivered', 'cancelled'].includes(delivery.status),
-        )
-        const hasPendingOutboundDelivery = outboundDeliveries.some(
-          (delivery) => delivery.status !== 'delivered',
-        )
-        const canConfirmReceipt =
-          isBorrower &&
-          ((transaction.delivery_method === 'self_pickup' && transaction.status === 'accepted') ||
-            (transaction.delivery_method === 'volunteer' &&
-              transaction.status === 'delivered' &&
-              !hasPendingOutboundDelivery))
-        const canRequestReturn =
-          isBorrower && transaction.transaction_type === 'borrow' && transaction.status === 'completed'
-        const canConfirmReturn =
-          isOwner && transaction.transaction_type === 'borrow' && transaction.status === 'return_requested'
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<TabType>('given')
 
-        return (
-          <article className="entity-card" key={transaction.id}>
-            <div className="entity-main">
-              <div className="entity-icon">
-                <ArrowRightLeft size={22} />
+  // Bộ lọc của Admin
+  const [searchTerm, setSearchTerm] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [methodFilter, setMethodFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const isAdmin = account?.role === 'admin'
+
+  const givenTransactions = transactions.filter(
+    (t) => t.owner_account_id === account?.id
+  )
+  const borrowedTransactions = transactions.filter(
+    (t) => t.borrower_account_id === account?.id
+  )
+
+  // Tìm kiếm & lọc cho Admin
+  const adminFilteredTransactions = transactions.filter((t) => {
+    if (!isAdmin) return false
+
+    const ownerName = accountMap.get(t.owner_account_id)?.full_name || ''
+    const borrowerName = accountMap.get(t.borrower_account_id)?.full_name || ''
+    const bookTitle = bookMap.get(t.book_id)?.title || ''
+
+    const matchesSearch =
+      t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      borrowerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bookTitle.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesType = typeFilter === 'all' || t.transaction_type === typeFilter
+    const matchesMethod = methodFilter === 'all' || t.delivery_method === methodFilter
+    const matchesStatus = statusFilter === 'all' || t.status === statusFilter
+
+    return matchesSearch && matchesType && matchesMethod && matchesStatus
+  })
+
+  // Tìm kiếm & lọc cho Thành viên
+  const memberFilteredTransactions = (activeTab === 'given' ? givenTransactions : borrowedTransactions).filter((t) => {
+    if (isAdmin) return false
+
+    const ownerName = accountMap.get(t.owner_account_id)?.full_name || ''
+    const borrowerName = accountMap.get(t.borrower_account_id)?.full_name || ''
+    const bookTitle = bookMap.get(t.book_id)?.title || ''
+
+    const matchesSearch =
+      t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      borrowerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bookTitle.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesType = typeFilter === 'all' || t.transaction_type === typeFilter
+    const matchesMethod = methodFilter === 'all' || t.delivery_method === methodFilter
+    const matchesStatus = statusFilter === 'all' || t.status === statusFilter
+
+    return matchesSearch && matchesType && matchesMethod && matchesStatus
+  })
+
+  if (transactions.length === 0) {
+    return <EmptyState icon={ArrowRightLeft} text="Chưa có giao dịch." />
+  }
+
+  const selectedTransaction = selectedTransactionId
+    ? transactions.find((t) => t.id === selectedTransactionId)
+    : null
+
+  return (
+    <>
+      <section className="transactions-container">
+        {isAdmin ? (
+          /* PHẦN HIỂN THỊ CỦA ADMIN */
+          <>
+            {/* Bộ lọc & Tìm kiếm Admin */}
+            <div className="admin-filters-bar">
+              <div className="search-wrapper">
+                <Search size={18} className="search-icon" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo Mã GD, Tên chủ sách, Tên người mượn..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="admin-search-input"
+                />
               </div>
-              <div>
-                <div className="entity-title-row">
-                  <h2>{book?.title || 'Sách đã xóa'}</h2>
-                  <StatusPill status={transaction.status}>
-                    {transactionStatusLabels[transaction.status]}
-                  </StatusPill>
+
+              <div className="filters-group">
+                <div className="filter-item">
+                  <label>Loại GD:</label>
+                  <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                    <option value="all">Tất cả</option>
+                    <option value="borrow">Mượn sách</option>
+                    <option value="exchange">Trao đổi</option>
+                  </select>
                 </div>
-                <p>
-                  {owner?.full_name || 'Chủ sách'} ↔ {borrower?.full_name || 'Người nhận'}
-                </p>
-                <dl className="meta-grid">
-                  <div>
-                    <dt>Loại</dt>
-                    <dd>{transactionTypeLabels[transaction.transaction_type]}</dd>
-                  </div>
-                  <div>
-                    <dt>Giao nhận</dt>
-                    <dd>{deliveryMethodLabels[transaction.delivery_method]}</dd>
-                  </div>
-                  <div>
-                    <dt>Lấy sách</dt>
-                    <dd>{transaction.pickup_location || book?.pickup_location || 'Chưa cập nhật'}</dd>
-                  </div>
-                  {transaction.dropoff_location && (
-                    <div>
-                      <dt>Nhận sách</dt>
-                      <dd>{transaction.dropoff_location || 'Chưa cập nhật'}</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt>Điểm</dt>
-                    <dd>
-                      +{pointRule[transaction.transaction_type]} / -{pointRule[transaction.transaction_type]}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Tạo lúc</dt>
-                    <dd>{formatDate(transaction.created_at)}</dd>
-                  </div>
-                </dl>
-                {transactionDeliveries.length > 0 && (
-                  <div className="delivery-stack">
-                    {transactionDeliveries.map((delivery) => (
-                      <div className="inline-note" key={delivery.id}>
-                        <Truck size={16} />
-                        <span>
-                          {deliveryTypeLabels[delivery.delivery_type]}:{' '}
-                          {deliveryStatusLabels[delivery.status]}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="next-step-note">
-                  <Clock3 size={16} />
-                  <span>{getTransactionActionText(transaction, account?.id)}</span>
+
+                <div className="filter-item">
+                  <label>Giao nhận:</label>
+                  <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)}>
+                    <option value="all">Tất cả</option>
+                    <option value="self_pickup">Tự giao nhận</option>
+                    <option value="volunteer">Nhờ người giao</option>
+                  </select>
+                </div>
+
+                <div className="filter-item">
+                  <label>Trạng thái:</label>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option value="all">Tất cả</option>
+                    <option value="requested">Chờ duyệt</option>
+                    <option value="accepted">Đã chấp nhận</option>
+                    <option value="delivered">Chờ nhận</option>
+                    <option value="completed">Hoàn tất</option>
+                    <option value="return_requested">Chờ hoàn trả</option>
+                    <option value="returned">Đã trả sách</option>
+                    <option value="rejected">Đã từ chối</option>
+                    <option value="cancelled">Đã hủy</option>
+                  </select>
                 </div>
               </div>
             </div>
-            <div className="entity-actions">
-              {isOwner && transaction.status === 'requested' && (
-                <>
-                  <ActionButton
-                    type="button"
-                    icon={Check}
-                    busy={busyKey === `accept-${transaction.id}`}
-                    onClick={() => onAccept(transaction)}
-                  >
-                    Chấp nhận
-                  </ActionButton>
-                  <ActionButton
-                    type="button"
-                    icon={X}
-                    variant="secondary"
-                    busy={busyKey === `reject-${transaction.id}`}
-                    onClick={() => onReject(transaction)}
-                  >
-                    Từ chối
-                  </ActionButton>
-                </>
-              )}
-              {canConfirmReceipt && (
-                <ActionButton
-                  type="button"
-                  icon={PackageCheck}
-                  busy={busyKey === `confirm-${transaction.id}`}
-                  onClick={() => onConfirm(transaction)}
-                >
-                  Đã nhận sách
-                </ActionButton>
-              )}
-              {canRequestReturn && (
-                <ActionButton
-                  type="button"
-                  icon={PackageCheck}
-                  variant="secondary"
-                  busy={busyKey === 'return-request'}
-                  onClick={() => onRequestReturn(transaction)}
-                >
-                  Yêu cầu trả
-                </ActionButton>
-              )}
-              {canConfirmReturn && (
-                <ActionButton
-                  type="button"
-                  icon={PackageCheck}
-                  variant="secondary"
-                  busy={busyKey === `return-${transaction.id}`}
-                  disabled={hasPendingReturnDelivery}
-                  title={hasPendingReturnDelivery ? 'Cần hoàn tất đơn giao trả trước.' : undefined}
-                  onClick={() => onConfirmReturn(transaction)}
-                >
-                  {hasPendingReturnDelivery ? 'Chờ đơn giao trả' : 'Đã nhận lại'}
-                </ActionButton>
+
+            {/* Bảng giao dịch của Admin hiển thị đầy đủ thông tin yêu cầu */}
+            <div className="transactions-table-container">
+              {adminFilteredTransactions.length === 0 ? (
+                <EmptyState icon={ArrowRightLeft} text="Không tìm thấy giao dịch nào khớp với bộ lọc tìm kiếm." />
+              ) : (
+                <div className="table-wrapper">
+                  <table className="transactions-table">
+                    <thead>
+                      <tr>
+                        <th>Mã giao dịch</th>
+                        <th>Chủ sở hữu (Chủ sách)</th>
+                        <th>Người nhận (Người mượn)</th>
+                        <th>Loại giao dịch</th>
+                        <th>Giao nhận</th>
+                        <th>Trạng thái</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminFilteredTransactions.map((transaction) => {
+                        const owner = accountMap.get(transaction.owner_account_id)
+                        const borrower = accountMap.get(transaction.borrower_account_id)
+
+                        return (
+                          <tr key={transaction.id} className="transaction-row">
+                            <td className="cell-id">
+                              <code className="transaction-id">{transaction.id}</code>
+                            </td>
+                            <td className="cell-name">{owner?.full_name || 'Chủ sách'}</td>
+                            <td className="cell-name">{borrower?.full_name || 'Người nhận'}</td>
+                            <td className="cell-type">{transactionTypeLabels[transaction.transaction_type]}</td>
+                            <td className="cell-method">{deliveryMethodLabels[transaction.delivery_method]}</td>
+                            <td className="cell-status">
+                              <StatusPill status={transaction.status}>
+                                {transactionStatusLabels[transaction.status]}
+                              </StatusPill>
+                            </td>
+                            <td className="cell-detail">
+                              <button
+                                className="detail-button"
+                                onClick={() => setSelectedTransactionId(transaction.id)}
+                                title="Xem chi tiết"
+                              >
+                                <ChevronRight size={18} />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
-          </article>
-        )
-      })}
-      {transactions.length === 0 && <EmptyState icon={ArrowRightLeft} text="Chưa có giao dịch." />}
-    </section>
+          </>
+        ) : (
+          /* PHẦN HIỂN THỊ CỦA THÀNH VIÊN THƯỜNG */
+          <>
+            <div className="transactions-tabs">
+              <button
+                className={`tab-button ${activeTab === 'given' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('given')
+                  // Reset search & filters khi đổi tab để trải nghiệm mượt mà
+                  setSearchTerm('')
+                  setTypeFilter('all')
+                  setMethodFilter('all')
+                  setStatusFilter('all')
+                }}
+              >
+                <span className="tab-label">Đơn sách cho mượn</span>
+                <span className="tab-count">{givenTransactions.length}</span>
+              </button>
+              <button
+                className={`tab-button ${activeTab === 'borrowed' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('borrowed')
+                  // Reset search & filters khi đổi tab để trải nghiệm mượt mà
+                  setSearchTerm('')
+                  setTypeFilter('all')
+                  setMethodFilter('all')
+                  setStatusFilter('all')
+                }}
+              >
+                <span className="tab-label">Đơn sách tôi mượn</span>
+                <span className="tab-count">{borrowedTransactions.length}</span>
+              </button>
+            </div>
+
+            {/* Bộ lọc tìm kiếm cho Thành viên (dưới thanh Tabs) */}
+            <div className="admin-filters-bar" style={{ marginTop: '1rem' }}>
+              <div className="search-wrapper">
+                <Search size={18} className="search-icon" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo Mã GD, Tên đối tác, Tên sách..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="admin-search-input"
+                />
+              </div>
+
+              <div className="filters-group">
+                <div className="filter-item">
+                  <label>Loại GD:</label>
+                  <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                    <option value="all">Tất cả</option>
+                    <option value="borrow">Mượn sách</option>
+                    <option value="exchange">Trao đổi</option>
+                  </select>
+                </div>
+
+                <div className="filter-item">
+                  <label>Giao nhận:</label>
+                  <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)}>
+                    <option value="all">Tất cả</option>
+                    <option value="self_pickup">Tự giao nhận</option>
+                    <option value="volunteer">Nhờ người giao</option>
+                  </select>
+                </div>
+
+                <div className="filter-item">
+                  <label>Trạng thái:</label>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option value="all">Tất cả</option>
+                    <option value="requested">Chờ duyệt</option>
+                    <option value="accepted">Đã chấp nhận</option>
+                    <option value="delivered">Chờ nhận</option>
+                    <option value="completed">Hoàn tất</option>
+                    <option value="return_requested">Chờ hoàn trả</option>
+                    <option value="returned">Đã trả sách</option>
+                    <option value="rejected">Đã từ chối</option>
+                    <option value="cancelled">Đã hủy</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="transactions-table-container">
+              {memberFilteredTransactions.length === 0 ? (
+                <EmptyState icon={ArrowRightLeft} text="Không tìm thấy giao dịch nào khớp với bộ lọc tìm kiếm." />
+              ) : (
+                <TransactionTable
+                  transactions={memberFilteredTransactions}
+                  accountMap={accountMap}
+                  tab={activeTab}
+                  onSelectTransaction={setSelectedTransactionId}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </section>
+
+      {selectedTransaction && (
+        <TransactionDetailDialog
+          transaction={selectedTransaction}
+          book={bookMap.get(selectedTransaction.book_id)}
+          owner={accountMap.get(selectedTransaction.owner_account_id)}
+          borrower={accountMap.get(selectedTransaction.borrower_account_id)}
+          account={account}
+          deliveries={deliveries.get(selectedTransaction.id) || []}
+          accountMap={accountMap}
+          busyKey={busyKey}
+          onClose={() => setSelectedTransactionId(null)}
+          onAccept={() => {
+            onAccept(selectedTransaction)
+            setSelectedTransactionId(null)
+          }}
+          onReject={() => {
+            onReject(selectedTransaction)
+            setSelectedTransactionId(null)
+          }}
+          onConfirm={() => {
+            onConfirm(selectedTransaction)
+            setSelectedTransactionId(null)
+          }}
+          onRequestReturn={() => {
+            onRequestReturn(selectedTransaction)
+            setSelectedTransactionId(null)
+          }}
+          onConfirmReturn={() => {
+            onConfirmReturn(selectedTransaction)
+            setSelectedTransactionId(null)
+          }}
+        />
+      )}
+    </>
   )
 }

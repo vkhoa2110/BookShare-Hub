@@ -3,9 +3,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   AlertTriangle,
-  BookOpen,
+  ChevronDown,
   CircleDollarSign,
+  History,
+  Library,
   LogOut,
+  MapPin,
   Plus,
   RefreshCw,
   UserRound,
@@ -18,7 +21,6 @@ import { AdminView } from '../features/admin/AdminView'
 import { BooksView } from '../features/books/BooksView'
 import { BookFormModal } from '../features/books/BookFormModal'
 import { createBookForm } from '../features/books/bookForms'
-import { filterBooks } from '../features/books/bookUtils'
 import { ComplaintsView } from '../features/complaints/ComplaintsView'
 import { emptyComplaintForm } from '../features/complaints/complaintForms'
 import { DashboardView } from '../features/dashboard/DashboardView'
@@ -83,7 +85,6 @@ import type {
   BookForm,
   ComplaintForm,
   Notice,
-  OwnershipFilter,
   RequestForm,
   ReturnForm,
   View,
@@ -101,6 +102,7 @@ function App() {
   const [ledger, setLedger] = useState<PointLedger[]>([])
   const [history, setHistory] = useState<TransactionHistory[]>([])
   const [activeView, setActiveView] = useState<View>('dashboard')
+  const [isProfileExpanded, setIsProfileExpanded] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [authMode, setAuthMode] = useState<AuthMode>('signin')
   const [loading, setLoading] = useState(true)
@@ -109,8 +111,6 @@ function App() {
   const [schemaReady, setSchemaReady] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all')
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [isBookCreateOpen, setIsBookCreateOpen] = useState(false)
   const [requestBookId, setRequestBookId] = useState<string | null>(null)
@@ -231,6 +231,15 @@ function App() {
     }
   }, [ensureAccount, loadAppData])
 
+  const handleViewChange = useCallback((view: View) => {
+    setActiveView(view)
+    if (view.startsWith('profile')) {
+      setIsProfileExpanded(true)
+    } else {
+      setIsProfileExpanded(false)
+    }
+  }, [])
+
   const accountMap = useMemo(() => {
     return new Map(accounts.map((item) => [item.id, item]))
   }, [accounts])
@@ -255,27 +264,19 @@ function App() {
     )
   }, [books])
 
-  const filteredBooks = useMemo(() => {
-    return filterBooks({
-      books,
-      account,
-      searchTerm,
-      categoryFilter,
-      statusFilter,
-      ownershipFilter,
-    })
-  }, [account, books, categoryFilter, ownershipFilter, searchTerm, statusFilter])
-
   const myTransactions = useMemo(() => {
     if (!account) {
       return []
     }
 
+    // Admin see all transactions, members see only their own
+    if (account.role === 'admin') {
+      return transactions
+    }
+
     return transactions.filter(
       (transaction) =>
-        transaction.owner_account_id === account.id ||
-        transaction.borrower_account_id === account.id ||
-        account.role === 'admin',
+        transaction.owner_account_id === account.id || transaction.borrower_account_id === account.id,
     )
   }, [account, transactions])
 
@@ -396,7 +397,7 @@ function App() {
     setSession(null)
     clearLocalData()
     setIsBookCreateOpen(false)
-    setActiveView('dashboard')
+    handleViewChange('dashboard')
   }
 
   function useDemoAccount(email: string, password: string) {
@@ -454,7 +455,7 @@ function App() {
       cover_image_url: book.cover_image_url || null,
       cover_file: null,
     })
-    setActiveView('books')
+    handleViewChange('books')
   }
 
   function resetBookForm() {
@@ -464,7 +465,7 @@ function App() {
 
   function openBookCreate() {
     resetBookForm()
-    setActiveView('books')
+    handleViewChange('books')
     setIsBookCreateOpen(true)
   }
 
@@ -505,7 +506,7 @@ function App() {
 
       setRequestBookId(null)
       setRequestForm(emptyRequestForm)
-      setActiveView('transactions')
+      handleViewChange('transactions')
     })
   }
 
@@ -553,7 +554,7 @@ function App() {
 
       setReturnTransactionId(null)
       setReturnForm(emptyReturnForm)
-      setActiveView('transactions')
+      handleViewChange('transactions')
     })
   }
 
@@ -714,7 +715,7 @@ function App() {
       <main className="auth-shell">
         <section className="auth-brand" aria-label="BookShare Hub">
           <div className="brand-mark">
-            <BookOpen size={34} />
+            <img src="/logo.svg" alt="BookShare Hub" className="brand-logo" />
           </div>
           <h1>BookShare Hub</h1>
           <div className="auth-metrics">
@@ -800,7 +801,7 @@ function App() {
       <aside className="sidebar" aria-label="Điều hướng">
         <div className="sidebar-brand">
           <div className="brand-mark compact">
-            <BookOpen size={24} />
+            <img src="/logo.svg" alt="BookShare Hub" className="brand-logo-compact" />
           </div>
           <div>
             <strong>BookShare Hub</strong>
@@ -811,17 +812,96 @@ function App() {
         <nav className="nav-list">
           {navItems
             .filter((item) => !item.adminOnly || account?.role === 'admin')
-            .map((item) => (
-              <button
-                key={item.view}
-                type="button"
-                className={activeView === item.view ? 'active' : ''}
-                onClick={() => setActiveView(item.view)}
-              >
-                <item.icon size={18} />
-                <span>{item.label}</span>
-              </button>
-            ))}
+            .map((item) => {
+              const isProfile = item.view === 'profile'
+              const isProfileActive = activeView.startsWith('profile')
+
+              if (isProfile) {
+                return (
+                  <div key="profile-group" style={{ display: 'grid', gap: '4px' }}>
+                    <button
+                      type="button"
+                      className={isProfileActive ? 'active' : ''}
+                      onClick={() => {
+                        setIsProfileExpanded(!isProfileExpanded)
+                        if (!activeView.startsWith('profile')) {
+                          handleViewChange('profile-info')
+                        }
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', width: '100%' }}
+                    >
+                      <item.icon size={18} />
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                      <ChevronDown
+                        size={16}
+                        style={{
+                          transform: isProfileExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s ease',
+                          opacity: 0.7,
+                        }}
+                      />
+                    </button>
+
+                    {isProfileExpanded && (
+                      <div className="sub-nav-list">
+                        <button
+                          type="button"
+                          className={activeView === 'profile-info' ? 'active' : ''}
+                          onClick={() => handleViewChange('profile-info')}
+                        >
+                          <UserRound size={16} />
+                          <span>Thông tin cá nhân</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={activeView === 'profile-addresses' ? 'active' : ''}
+                          onClick={() => handleViewChange('profile-addresses')}
+                        >
+                          <MapPin size={16} />
+                          <span>Địa chỉ nhận sách</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={activeView === 'profile-books' ? 'active' : ''}
+                          onClick={() => handleViewChange('profile-books')}
+                        >
+                          <Library size={16} />
+                          <span>Sách của tôi</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={activeView === 'profile-points' ? 'active' : ''}
+                          onClick={() => handleViewChange('profile-points')}
+                        >
+                          <CircleDollarSign size={16} />
+                          <span>Lịch sử điểm</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={activeView === 'profile-history' ? 'active' : ''}
+                          onClick={() => handleViewChange('profile-history')}
+                        >
+                          <History size={16} />
+                          <span>Lịch sử giao dịch</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
+              return (
+                <button
+                  key={item.view}
+                  type="button"
+                  className={activeView === item.view ? 'active' : ''}
+                  onClick={() => handleViewChange(item.view)}
+                >
+                  <item.icon size={18} />
+                  <span>{item.label}</span>
+                </button>
+              )
+            })}
         </nav>
 
         <div className="sidebar-footer">
@@ -829,7 +909,7 @@ function App() {
             <div className="avatar">{initials(account?.full_name || session.user.email || 'BH')}</div>
             <div>
               <strong>{account?.full_name || session.user.email}</strong>
-              <span>{account ? roleLabels[account.role] : 'Thành viên'}</span>
+              <span>{account?.points ?? 0} điểm</span>
             </div>
           </div>
           <ActionButton icon={LogOut} variant="secondary" onClick={handleSignOut}>
@@ -839,24 +919,24 @@ function App() {
       </aside>
 
       <section className="workspace">
-        <header className="topbar">
-          <div>
-            <span className="eyebrow">{account ? roleLabels[account.role] : 'Thành viên'}</span>
-            <h1>{pageTitle(activeView)}</h1>
-          </div>
-          <div className="topbar-actions">
-            <ActionButton type="button" icon={Plus} variant="secondary" onClick={openBookCreate}>
-              Thêm sách
-            </ActionButton>
-            <div className="score-pill">
-              <CircleDollarSign size={18} />
-              <span>{account?.points ?? 0} điểm</span>
+        {activeView !== 'books' && (
+          <header className="topbar">
+            <div>
+              <span className="eyebrow">{account ? roleLabels[account.role] : 'Thành viên'}</span>
+              <h1>{pageTitle(activeView)}</h1>
             </div>
-            <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
-              <RefreshCw size={18} />
-            </IconOnlyButton>
-          </div>
-        </header>
+            {activeView !== 'transactions' && (
+              <div className="topbar-actions">
+                <ActionButton type="button" icon={Plus} variant="secondary" onClick={openBookCreate}>
+                  Thêm sách
+                </ActionButton>
+                <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
+                  <RefreshCw size={18} />
+                </IconOnlyButton>
+              </div>
+            )}
+          </header>
+        )}
 
         {!schemaReady && (
           <div className="setup-banner">
@@ -878,7 +958,7 @@ function App() {
             ledger={ledger}
             accountMap={accountMap}
             bookMap={bookMap}
-            setActiveView={setActiveView}
+            setActiveView={handleViewChange}
           />
         )}
 
@@ -886,22 +966,16 @@ function App() {
           <BooksView
             account={account}
             accountMap={accountMap}
-            books={filteredBooks}
-            allBooks={books}
-            transactions={myTransactions}
+            books={books}
             addressOptions={accountAddresses}
             categories={categories}
             searchTerm={searchTerm}
             categoryFilter={categoryFilter}
-            statusFilter={statusFilter}
-            ownershipFilter={ownershipFilter}
             bookForm={bookForm}
             editingBookId={editingBookId}
             busyKey={busyKey}
             onSearch={setSearchTerm}
             onCategoryFilter={setCategoryFilter}
-            onStatusFilter={setStatusFilter}
-            onOwnershipFilter={setOwnershipFilter}
             onBookFormChange={setBookForm}
             onBookSubmit={handleBookSubmit}
             onResetBookForm={resetBookForm}
@@ -913,6 +987,7 @@ function App() {
               setRequestBookId(book.id)
               setRequestForm(createRequestForm(accountAddresses))
             }}
+            onOpenBookCreate={openBookCreate}
           />
         )}
 
@@ -964,8 +1039,9 @@ function App() {
           />
         )}
 
-        {activeView === 'profile' && (
+        {activeView.startsWith('profile') && (
           <ProfileView
+            subView={activeView}
             account={account}
             form={profileForm}
             addresses={accountAddresses}
@@ -982,6 +1058,8 @@ function App() {
             onEditAddress={startEditAddress}
             onDeleteAddress={deleteAddress}
             onResetAddressForm={resetAddressForm}
+            books={books}
+            transactions={transactions}
           />
         )}
 

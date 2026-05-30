@@ -154,7 +154,7 @@ export function DashboardView({
             icon={History}
             title="Biến động điểm"
             action={
-              <button type="button" className="link-button" onClick={() => setActiveView('profile')}>
+              <button type="button" className="link-button" onClick={() => setActiveView('profile-points')}>
                 Lịch sử <ChevronRight size={16} />
               </button>
             }
