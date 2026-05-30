@@ -3,9 +3,7 @@ import {
   PackageCheck,
   Truck,
   X,
-  Calendar,
   MapPin,
-  User,
   ArrowRight,
   BookOpen,
   CheckCircle2,
@@ -18,19 +16,19 @@ import {
 import {
   deliveryStatusLabels,
   deliveryTypeLabels,
-  transactionStatusLabels,
   transactionTypeLabels,
   deliveryMethodLabels,
 } from '../../shared/constants/labels'
 import { pointRule } from '../../shared/constants/rules'
-import { ActionButton, IconOnlyButton, StatusPill } from '../../shared/components'
+import { ActionButton, IconOnlyButton } from '../../shared/components'
 import { formatDate } from '../../shared/utils/date'
-import type { Account, Book, BookTransaction, Delivery, TransactionStatus, TransactionType } from '../../types/domain'
+import type { LucideIcon } from 'lucide-react'
+import type { Account, Book, BookTransaction, Delivery } from '../../types/domain'
 
 interface Step {
   id: number
   label: string
-  icon: any
+  icon: LucideIcon
   isCompleted: boolean
   isActive: boolean
   isWarning?: boolean
@@ -265,7 +263,6 @@ export function TransactionDetailDialog({
               <div className="book-sidebar-card">
                 <div className="book-sidebar-cover">
                   {book?.cover_image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={book.cover_image_url} alt={`Bìa ${book.title}`} />
                   ) : (
                     <div className="book-cover--placeholder">No Image</div>
@@ -383,16 +380,16 @@ export function TransactionDetailDialog({
                       <dd className="text-warning-value">{formatDate(transaction.return_due_at)}</dd>
                     </div>
                   )}
-                  {transaction.responded_at && (
+                  {transaction.owner_confirmed_at && (
                     <div>
                       <dt>Ngày xác nhận</dt>
-                      <dd>{formatDate(transaction.responded_at)}</dd>
+                      <dd>{formatDate(transaction.owner_confirmed_at)}</dd>
                     </div>
                   )}
-                  {transaction.completed_at && (
+                  {transaction.borrower_confirmed_at && (
                     <div>
                       <dt>Ngày hoàn tất</dt>
-                      <dd>{formatDate(transaction.completed_at)}</dd>
+                      <dd>{formatDate(transaction.borrower_confirmed_at)}</dd>
                     </div>
                   )}
                 </dl>

@@ -15,13 +15,11 @@ type TabType = 'given' | 'borrowed'
 function TransactionTable({
   transactions,
   accountMap,
-  bookMap,
   tab,
   onSelectTransaction,
 }: {
   transactions: BookTransaction[]
   accountMap: Map<string, Account>
-  bookMap: Map<string, Book>
   tab: TabType
   onSelectTransaction: (id: string) => void
 }) {
@@ -158,7 +156,6 @@ export function TransactionsView({
             <TransactionTable
               transactions={displayTransactions}
               accountMap={accountMap}
-              bookMap={bookMap}
               tab={activeTab}
               onSelectTransaction={setSelectedTransactionId}
             />
