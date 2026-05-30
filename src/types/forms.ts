@@ -1,6 +1,18 @@
 import type { BookCondition, DeliveryMethod, TransactionType } from './domain'
 
-export type View = 'dashboard' | 'books' | 'transactions' | 'deliveries' | 'complaints' | 'profile' | 'admin'
+export type View =
+  | 'dashboard'
+  | 'books'
+  | 'transactions'
+  | 'deliveries'
+  | 'complaints'
+  | 'profile'
+  | 'profile-info'
+  | 'profile-addresses'
+  | 'profile-books'
+  | 'profile-points'
+  | 'profile-history'
+  | 'admin'
 export type Notice = { type: 'success' | 'error' | 'info'; text: string } | null
 export type AuthMode = 'signin' | 'signup'
 export type OwnershipFilter = 'all' | 'available' | 'mine'

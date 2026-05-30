@@ -21,6 +21,12 @@ export const navItems: Array<{ view: View; label: string; icon: LucideIcon; admi
 ]
 
 export function pageTitle(view: View) {
+  if (view === 'profile' || view === 'profile-info') return 'Hồ sơ - Thông tin cá nhân'
+  if (view === 'profile-addresses') return 'Hồ sơ - Địa chỉ nhận sách'
+  if (view === 'profile-books') return 'Hồ sơ - Sách của tôi'
+  if (view === 'profile-points') return 'Hồ sơ - Lịch sử điểm'
+  if (view === 'profile-history') return 'Hồ sơ - Lịch sử giao dịch'
+
   const item = navItems.find((navItem) => navItem.view === view)
   return item?.label || 'BookShare Hub'
 }
