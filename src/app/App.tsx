@@ -22,7 +22,6 @@ import { AdminView } from '../features/admin/AdminView'
 import { BooksView } from '../features/books/BooksView'
 import { BookFormModal } from '../features/books/BookFormModal'
 import { createBookForm } from '../features/books/bookForms'
-import { filterBooks } from '../features/books/bookUtils'
 import { ComplaintsView } from '../features/complaints/ComplaintsView'
 import { emptyComplaintForm } from '../features/complaints/complaintForms'
 import { DashboardView } from '../features/dashboard/DashboardView'
@@ -90,7 +89,6 @@ import type {
   BookForm,
   ComplaintForm,
   Notice,
-  OwnershipFilter,
   RequestForm,
   ReturnForm,
   View,
@@ -118,8 +116,6 @@ function App() {
   const [schemaReady, setSchemaReady] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all')
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [isBookCreateOpen, setIsBookCreateOpen] = useState(false)
   const [requestBookId, setRequestBookId] = useState<string | null>(null)
@@ -278,17 +274,6 @@ function App() {
     )
   }, [books])
 
-  const filteredBooks = useMemo(() => {
-    return filterBooks({
-      books,
-      account,
-      searchTerm,
-      categoryFilter,
-      statusFilter,
-      ownershipFilter,
-    })
-  }, [account, books, categoryFilter, ownershipFilter, searchTerm, statusFilter])
-
   const myTransactions = useMemo(() => {
     if (!account) {
       return []
@@ -301,8 +286,7 @@ function App() {
 
     return transactions.filter(
       (transaction) =>
-        transaction.owner_account_id === account.id ||
-        transaction.borrower_account_id === account.id,
+        transaction.owner_account_id === account.id || transaction.borrower_account_id === account.id,
     )
   }, [account, transactions])
 
@@ -489,7 +473,11 @@ function App() {
     setBookForm(createBookForm(accountAddresses))
   }
 
-
+  function openBookCreate() {
+    resetBookForm()
+    handleViewChange('books')
+    setIsBookCreateOpen(true)
+  }
 
   function closeBookCreate() {
     setIsBookCreateOpen(false)
@@ -781,7 +769,7 @@ function App() {
       <main className="auth-shell">
         <section className="auth-brand" aria-label="BookShare Hub">
           <div className="brand-mark">
-            <BookOpen size={34} />
+            <img src="/logo.svg" alt="BookShare Hub" className="brand-logo" />
           </div>
           <h1>BookShare Hub</h1>
           <div className="auth-metrics">
@@ -867,7 +855,7 @@ function App() {
       <aside className="sidebar" aria-label="Điều hướng">
         <div className="sidebar-brand">
           <div className="brand-mark compact">
-            <BookOpen size={24} />
+            <img src="/logo.svg" alt="BookShare Hub" className="brand-logo-compact" />
           </div>
           <div>
             <strong>BookShare Hub</strong>
@@ -1043,7 +1031,7 @@ function App() {
             <div className="avatar">{initials(account?.full_name || session.user.email || 'BH')}</div>
             <div>
               <strong>{account?.full_name || session.user.email}</strong>
-              <span>{account ? roleLabels[account.role] : 'Thành viên'}</span>
+              <span>{account?.points ?? 0} điểm</span>
             </div>
           </div>
           <ActionButton icon={LogOut} variant="secondary" onClick={handleSignOut}>
@@ -1109,20 +1097,16 @@ function App() {
           <BooksView
             account={account}
             accountMap={accountMap}
-            books={filteredBooks}
+            books={books}
             addressOptions={accountAddresses}
             categories={categories}
             searchTerm={searchTerm}
             categoryFilter={categoryFilter}
-            statusFilter={statusFilter}
-            ownershipFilter={ownershipFilter}
             bookForm={bookForm}
             editingBookId={editingBookId}
             busyKey={busyKey}
             onSearch={setSearchTerm}
             onCategoryFilter={setCategoryFilter}
-            onStatusFilter={setStatusFilter}
-            onOwnershipFilter={setOwnershipFilter}
             onBookFormChange={setBookForm}
             onBookSubmit={handleBookSubmit}
             onResetBookForm={resetBookForm}
@@ -1134,6 +1118,7 @@ function App() {
               setRequestBookId(book.id)
               setRequestForm(createRequestForm(accountAddresses))
             }}
+            onOpenBookCreate={openBookCreate}
           />
         )}
 

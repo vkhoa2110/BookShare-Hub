@@ -1,6 +1,10 @@
 import { BookOpen } from 'lucide-react'
 import type { Book } from '../../types/domain'
 
+function getBookInitial(title: string) {
+  return title.trim().charAt(0).toLocaleUpperCase('vi') || '?'
+}
+
 export function MiniBookItem({ book, detail }: { book: Book; detail: string }) {
   return (
     <div className="mini-book-item">
@@ -16,14 +20,17 @@ export function MiniBookItem({ book, detail }: { book: Book; detail: string }) {
 export function BookCover({ book, size = 'default' }: { book: Book; size?: 'default' | 'small' }) {
   return (
     <div
-      className={`book-cover condition-${book.condition} ${size === 'small' ? 'small' : ''} ${book.cover_image_url ? 'with-image' : ''}`}
+      className={`book-cover condition-${book.condition} ${size === 'small' ? 'small' : ''} ${
+        book.cover_image_url ? 'with-image' : 'with-placeholder'
+      }`}
     >
       {book.cover_image_url ? (
-        <img src={book.cover_image_url} alt="" />
+        <img src={book.cover_image_url} alt={`Bìa ${book.title}`} />
       ) : (
         <>
-          <BookOpen size={size === 'small' ? 20 : 28} />
-          <span>{book.category.slice(0, 22)}</span>
+          <div className="book-cover-placeholder-mark" aria-hidden="true">
+            {size === 'small' ? <BookOpen size={20} /> : getBookInitial(book.title)}
+          </div>
         </>
       )}
     </div>
