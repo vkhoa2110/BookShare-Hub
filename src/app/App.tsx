@@ -271,11 +271,15 @@ function App() {
       return []
     }
 
+    // Admin see all transactions, members see only their own
+    if (account.role === 'admin') {
+      return transactions
+    }
+
     return transactions.filter(
       (transaction) =>
         transaction.owner_account_id === account.id ||
-        transaction.borrower_account_id === account.id ||
-        account.role === 'admin',
+        transaction.borrower_account_id === account.id,
     )
   }, [account, transactions])
 
@@ -844,18 +848,20 @@ function App() {
             <span className="eyebrow">{account ? roleLabels[account.role] : 'Thành viên'}</span>
             <h1>{pageTitle(activeView)}</h1>
           </div>
-          <div className="topbar-actions">
-            <ActionButton type="button" icon={Plus} variant="secondary" onClick={openBookCreate}>
-              Thêm sách
-            </ActionButton>
-            <div className="score-pill">
-              <CircleDollarSign size={18} />
-              <span>{account?.points ?? 0} điểm</span>
+          {activeView !== 'transactions' && (
+            <div className="topbar-actions">
+              <ActionButton type="button" icon={Plus} variant="secondary" onClick={openBookCreate}>
+                Thêm sách
+              </ActionButton>
+              <div className="score-pill">
+                <CircleDollarSign size={18} />
+                <span>{account?.points ?? 0} điểm</span>
+              </div>
+              <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
+                <RefreshCw size={18} />
+              </IconOnlyButton>
             </div>
-            <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
-              <RefreshCw size={18} />
-            </IconOnlyButton>
-          </div>
+          )}
         </header>
 
         {!schemaReady && (
