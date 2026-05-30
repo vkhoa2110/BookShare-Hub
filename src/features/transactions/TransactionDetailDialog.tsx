@@ -443,67 +443,73 @@ export function TransactionDetailDialog({
         </div>
 
         {/* Các nút hành động */}
-        <div className="dialog-actions">
-          {isOwner && transaction.status === 'requested' && (
-            <div className="action-buttons">
-              <ActionButton
-                type="button"
-                icon={Check}
-                busy={busyKey === `accept-${transaction.id}`}
-                onClick={onAccept}
-                title="Chấp nhận giao dịch này"
-              >
-                Chấp nhận
-              </ActionButton>
-              <ActionButton
-                type="button"
-                icon={X}
-                variant="secondary"
-                busy={busyKey === `reject-${transaction.id}`}
-                onClick={onReject}
-                title="Từ chối giao dịch này"
-              >
-                Từ chối
-              </ActionButton>
+        {account?.role !== 'admin' &&
+          ((isOwner && transaction.status === 'requested') ||
+            canConfirmReceipt ||
+            canRequestReturn ||
+            canConfirmReturn) && (
+            <div className="dialog-actions">
+              {isOwner && transaction.status === 'requested' && (
+                <div className="action-buttons">
+                  <ActionButton
+                    type="button"
+                    icon={Check}
+                    busy={busyKey === `accept-${transaction.id}`}
+                    onClick={onAccept}
+                    title="Chấp nhận giao dịch này"
+                  >
+                    Chấp nhận
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
+                    icon={X}
+                    variant="secondary"
+                    busy={busyKey === `reject-${transaction.id}`}
+                    onClick={onReject}
+                    title="Từ chối giao dịch này"
+                  >
+                    Từ chối
+                  </ActionButton>
+                </div>
+              )}
+              {canConfirmReceipt && (
+                <ActionButton
+                  type="button"
+                  icon={PackageCheck}
+                  busy={busyKey === `confirm-${transaction.id}`}
+                  onClick={onConfirm}
+                  title="Xác nhận đã nhận sách"
+                >
+                  Đã nhận sách
+                </ActionButton>
+              )}
+              {canRequestReturn && (
+                <ActionButton
+                  type="button"
+                  icon={PackageCheck}
+                  variant="secondary"
+                  busy={busyKey === 'return-request'}
+                  onClick={onRequestReturn}
+                  title="Yêu cầu trả sách"
+                >
+                  Yêu cầu trả sách
+                </ActionButton>
+              )}
+              {canConfirmReturn && (
+                <ActionButton
+                  type="button"
+                  icon={PackageCheck}
+                  variant="secondary"
+                  busy={busyKey === `return-${transaction.id}`}
+                  disabled={hasPendingReturnDelivery}
+                  title={hasPendingReturnDelivery ? 'Cần hoàn tất đơn giao trả trước' : 'Xác nhận đã nhận lại sách'}
+                  onClick={onConfirmReturn}
+                >
+                  {hasPendingReturnDelivery ? 'Chờ đơn giao trả' : 'Đã nhận lại sách'}
+                </ActionButton>
+              )}
             </div>
           )}
-          {canConfirmReceipt && (
-            <ActionButton
-              type="button"
-              icon={PackageCheck}
-              busy={busyKey === `confirm-${transaction.id}`}
-              onClick={onConfirm}
-              title="Xác nhận đã nhận sách"
-            >
-              Đã nhận sách
-            </ActionButton>
-          )}
-          {canRequestReturn && (
-            <ActionButton
-              type="button"
-              icon={PackageCheck}
-              variant="secondary"
-              busy={busyKey === 'return-request'}
-              onClick={onRequestReturn}
-              title="Yêu cầu trả sách"
-            >
-              Yêu cầu trả sách
-            </ActionButton>
-          )}
-          {canConfirmReturn && (
-            <ActionButton
-              type="button"
-              icon={PackageCheck}
-              variant="secondary"
-              busy={busyKey === `return-${transaction.id}`}
-              disabled={hasPendingReturnDelivery}
-              title={hasPendingReturnDelivery ? 'Cần hoàn tất đơn giao trả trước' : 'Xác nhận đã nhận lại sách'}
-              onClick={onConfirmReturn}
-            >
-              {hasPendingReturnDelivery ? 'Chờ đơn giao trả' : 'Đã nhận lại sách'}
-            </ActionButton>
-          )}
-        </div>
       </section>
     </div>
   )
