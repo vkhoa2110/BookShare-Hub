@@ -22,7 +22,6 @@ import { AdminView } from '../features/admin/AdminView'
 import { BooksView } from '../features/books/BooksView'
 import { BookFormModal } from '../features/books/BookFormModal'
 import { createBookForm } from '../features/books/bookForms'
-import { filterBooks } from '../features/books/bookUtils'
 import { ComplaintsView } from '../features/complaints/ComplaintsView'
 import { emptyComplaintForm } from '../features/complaints/complaintForms'
 import { DashboardView } from '../features/dashboard/DashboardView'
@@ -87,7 +86,6 @@ import type {
   BookForm,
   ComplaintForm,
   Notice,
-  OwnershipFilter,
   RequestForm,
   ReturnForm,
   View,
@@ -114,7 +112,6 @@ function App() {
   const [schemaReady, setSchemaReady] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all')
   const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [isBookCreateOpen, setIsBookCreateOpen] = useState(false)
   const [requestBookId, setRequestBookId] = useState<string | null>(null)
@@ -268,17 +265,6 @@ function App() {
     )
   }, [books])
 
-  const filteredBooks = useMemo(() => {
-    return filterBooks({
-      books,
-      account,
-      searchTerm,
-      categoryFilter,
-      statusFilter: 'all',
-      ownershipFilter,
-    })
-  }, [account, books, categoryFilter, ownershipFilter, searchTerm])
-
   const myTransactions = useMemo(() => {
     if (!account) {
       return []
@@ -291,8 +277,7 @@ function App() {
 
     return transactions.filter(
       (transaction) =>
-        transaction.owner_account_id === account.id ||
-        transaction.borrower_account_id === account.id,
+        transaction.owner_account_id === account.id || transaction.borrower_account_id === account.id,
     )
   }, [account, transactions])
 
@@ -925,7 +910,7 @@ function App() {
             <div className="avatar">{initials(account?.full_name || session.user.email || 'BH')}</div>
             <div>
               <strong>{account?.full_name || session.user.email}</strong>
-              <span>{account ? roleLabels[account.role] : 'Thành viên'}</span>
+              <span>{account?.points ?? 0} điểm</span>
             </div>
           </div>
           <ActionButton icon={LogOut} variant="secondary" onClick={handleSignOut}>
@@ -935,26 +920,24 @@ function App() {
       </aside>
 
       <section className="workspace">
-        <header className="topbar">
-          <div>
-            <span className="eyebrow">{account ? roleLabels[account.role] : 'Thành viên'}</span>
-            <h1>{pageTitle(activeView)}</h1>
-          </div>
-          {activeView !== 'transactions' && (
-            <div className="topbar-actions">
-              <ActionButton type="button" icon={Plus} variant="secondary" onClick={openBookCreate}>
-                Thêm sách
-              </ActionButton>
-              <div className="score-pill">
-                <CircleDollarSign size={18} />
-                <span>{account?.points ?? 0} điểm</span>
-              </div>
-              <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
-                <RefreshCw size={18} />
-              </IconOnlyButton>
+        {activeView !== 'books' && (
+          <header className="topbar">
+            <div>
+              <span className="eyebrow">{account ? roleLabels[account.role] : 'Thành viên'}</span>
+              <h1>{pageTitle(activeView)}</h1>
             </div>
-          )}
-        </header>
+            {activeView !== 'transactions' && (
+              <div className="topbar-actions">
+                <ActionButton type="button" icon={Plus} variant="secondary" onClick={openBookCreate}>
+                  Thêm sách
+                </ActionButton>
+                <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
+                  <RefreshCw size={18} />
+                </IconOnlyButton>
+              </div>
+            )}
+          </header>
+        )}
 
         {!schemaReady && (
           <div className="setup-banner">
@@ -984,18 +967,16 @@ function App() {
           <BooksView
             account={account}
             accountMap={accountMap}
-            books={filteredBooks}
+            books={books}
             addressOptions={accountAddresses}
             categories={categories}
             searchTerm={searchTerm}
             categoryFilter={categoryFilter}
-            ownershipFilter={ownershipFilter}
             bookForm={bookForm}
             editingBookId={editingBookId}
             busyKey={busyKey}
             onSearch={setSearchTerm}
             onCategoryFilter={setCategoryFilter}
-            onOwnershipFilter={setOwnershipFilter}
             onBookFormChange={setBookForm}
             onBookSubmit={handleBookSubmit}
             onResetBookForm={resetBookForm}
@@ -1007,6 +988,7 @@ function App() {
               setRequestBookId(book.id)
               setRequestForm(createRequestForm(accountAddresses))
             }}
+            onOpenBookCreate={openBookCreate}
           />
         )}
 

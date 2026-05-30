@@ -82,4 +82,17 @@ describe('filterBooks', () => {
       }).map((book) => book.id),
     ).toEqual(['book-2'])
   })
+
+  it('normalizes Vietnamese accents in search terms', () => {
+    expect(
+      filterBooks({
+        books,
+        account,
+        searchTerm: 'de men',
+        categoryFilter: 'all',
+        statusFilter: 'all',
+        ownershipFilter: 'all',
+      }).map((book) => book.id),
+    ).toEqual(['book-2'])
+  })
 })
