@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import {
   AlertTriangle,
-  BookOpen,
   ChevronDown,
   CircleDollarSign,
   History,
@@ -716,7 +715,7 @@ function App() {
       <main className="auth-shell">
         <section className="auth-brand" aria-label="BookShare Hub">
           <div className="brand-mark">
-            <BookOpen size={34} />
+            <img src="/logo.svg" alt="BookShare Hub" className="brand-logo" />
           </div>
           <h1>BookShare Hub</h1>
           <div className="auth-metrics">
@@ -802,7 +801,7 @@ function App() {
       <aside className="sidebar" aria-label="Điều hướng">
         <div className="sidebar-brand">
           <div className="brand-mark compact">
-            <BookOpen size={24} />
+            <img src="/logo.svg" alt="BookShare Hub" className="brand-logo-compact" />
           </div>
           <div>
             <strong>BookShare Hub</strong>
