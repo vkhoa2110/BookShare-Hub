@@ -96,7 +96,7 @@ export function AdminView({
       full_name: accountForm.full_name.trim(),
       phone_number: accountForm.phone_number.trim() || null,
       role: accountForm.role,
-      points: Number(accountForm.points),
+      points: accountForm.role === 'admin' ? 0 : Number(accountForm.points),
       status: accountForm.status,
     })
 
@@ -258,6 +258,7 @@ export function AdminView({
               </div>
               <div className="dashboard-list">
                 {[...accounts]
+                  .filter((item) => item.role !== 'admin')
                   .sort((a, b) => b.points - a.points)
                   .slice(0, 5)
                   .map((item, idx) => {
@@ -458,7 +459,9 @@ export function AdminView({
                           {roleLabels[item.role]}
                         </span>
                       </td>
-                      <td style={{ fontWeight: 700, color: '#4f46e5' }}>{item.points}</td>
+                      <td style={{ fontWeight: 700, color: '#4f46e5' }}>
+                        {item.role === 'admin' ? '—' : item.points}
+                      </td>
                       <td>
                         <StatusPill status={item.status ? 'active' : 'locked'}>
                           {item.status ? 'Hoạt động' : 'Khóa'}
@@ -744,15 +747,17 @@ export function AdminView({
                   <option value="admin">Quản trị viên</option>
                 </select>
               </Field>
-              <Field label="Số điểm">
-                <input
-                  required
-                  type="number"
-                  min={0}
-                  value={accountForm.points}
-                  onChange={(e) => setAccountForm({ ...accountForm, points: Number(e.target.value) })}
-                />
-              </Field>
+              {accountForm.role !== 'admin' && (
+                <Field label="Số điểm">
+                  <input
+                    required
+                    type="number"
+                    min={0}
+                    value={accountForm.points}
+                    onChange={(e) => setAccountForm({ ...accountForm, points: Number(e.target.value) })}
+                  />
+                </Field>
+              )}
               <Field label="Trạng thái hoạt động">
                 <select
                   value={accountForm.status ? 'active' : 'locked'}

@@ -34,7 +34,7 @@ const users = [
     fullName: 'Quản trị viên',
     phone: '0900000001',
     role: 'admin',
-    points: 20,
+    points: 0,
   },
   {
     id: '10000000-0000-4000-8000-000000000002',

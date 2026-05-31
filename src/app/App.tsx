@@ -182,8 +182,12 @@ function App() {
 
       if (data.session) {
         try {
-          await ensureAccount(data.session)
+          const nextAccount = await ensureAccount(data.session)
           await loadAppData(data.session.user.id)
+          if (nextAccount?.role === 'admin') {
+            setActiveView('admin-overview')
+            setIsAdminExpanded(true)
+          }
         } catch (error) {
           setSchemaReady(false)
           setNotice({
@@ -211,8 +215,12 @@ function App() {
 
       window.setTimeout(async () => {
         try {
-          await ensureAccount(nextSession)
+          const nextAccount = await ensureAccount(nextSession)
           await loadAppData(nextSession.user.id)
+          if (nextAccount?.role === 'admin') {
+            setActiveView('admin-overview')
+            setIsAdminExpanded(true)
+          }
         } catch (error) {
           setSchemaReady(false)
           setNotice({
@@ -859,6 +867,7 @@ function App() {
         <nav className="nav-list">
           {navItems
             .filter((item) => !item.adminOnly || account?.role === 'admin')
+            .filter((item) => !(item.view === 'dashboard' && account?.role === 'admin'))
             .filter((item) => !(item.view === 'complaints' && account?.role === 'admin'))
             .filter((item) => !(item.view === 'notifications' && account?.role === 'admin'))
             .filter((item) => !(item.view === 'deliveries' && account?.role === 'admin'))
@@ -920,14 +929,16 @@ function App() {
                           <Library size={16} />
                           <span>Sách của tôi</span>
                         </button>
-                        <button
-                          type="button"
-                          className={activeView === 'profile-points' ? 'active' : ''}
-                          onClick={() => handleViewChange('profile-points')}
-                        >
-                          <CircleDollarSign size={16} />
-                          <span>Lịch sử điểm</span>
-                        </button>
+                        {account?.role !== 'admin' && (
+                          <button
+                            type="button"
+                            className={activeView === 'profile-points' ? 'active' : ''}
+                            onClick={() => handleViewChange('profile-points')}
+                          >
+                            <CircleDollarSign size={16} />
+                            <span>Lịch sử điểm</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           className={activeView === 'profile-history' ? 'active' : ''}
@@ -1027,7 +1038,9 @@ function App() {
             <div className="avatar">{initials(account?.full_name || session.user.email || 'BH')}</div>
             <div>
               <strong>{account?.full_name || session.user.email}</strong>
-              <span>{account?.points ?? 0} điểm</span>
+              <span>
+                {account?.role === 'admin' ? 'Quản trị viên' : `${account?.points ?? 0} điểm`}
+              </span>
             </div>
           </div>
           <ActionButton icon={LogOut} variant="secondary" onClick={handleSignOut}>

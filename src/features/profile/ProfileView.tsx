@@ -149,10 +149,12 @@ export function ProfileView({
                       {account ? roleLabels[account.role] : 'Đọc giả'}
                     </span>
                   )}
-                  <span className="profile-points-badge">
-                    <Award size={14} />
-                    <strong>{account?.points ?? 0}đ</strong>
-                  </span>
+                  {account?.role !== 'admin' && (
+                    <span className="profile-points-badge">
+                      <Award size={14} />
+                      <strong>{account?.points ?? 0}đ</strong>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -187,15 +189,17 @@ export function ProfileView({
                   </div>
                 </div>
 
-                <div className="detail-item-box">
-                  <div className="detail-item-icon">
-                    <Award size={16} />
+                {account?.role !== 'admin' && (
+                  <div className="detail-item-box">
+                    <div className="detail-item-icon">
+                      <Award size={16} />
+                    </div>
+                    <div className="detail-item-info">
+                      <span>Điểm thưởng tích lũy</span>
+                      <strong>{account?.points ?? 0} điểm</strong>
+                    </div>
                   </div>
-                  <div className="detail-item-info">
-                    <span>Điểm thưởng tích lũy</span>
-                    <strong>{account?.points ?? 0} điểm</strong>
-                  </div>
-                </div>
+                )}
 
                 <div className="detail-item-box">
                   <div className="detail-item-icon">
