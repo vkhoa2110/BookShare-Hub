@@ -17,11 +17,12 @@ import {
 } from 'lucide-react'
 import { bookStatusLabels, conditionLabels } from '../../shared/constants/labels'
 import { ActionButton, EmptyState, IconOnlyButton, PanelHeader, StatusPill } from '../../shared/components'
-import type { Account, AccountAddress, Book } from '../../types/domain'
+import type { Account, AccountAddress, Book, BookTransaction } from '../../types/domain'
 import type { BookForm } from '../../types/forms'
 import { BookFormBody } from './BookFormModal'
 import { BookCover } from './BookCover'
 import { filterBooks, normalizeBookSearchText } from './bookUtils'
+import { formatDate } from '../../shared/utils/date'
 
 type BookScope = 'all' | 'available' | 'borrowed'
 type BookSort = 'relevance' | 'newest' | 'title'
@@ -59,6 +60,7 @@ function BookDetailDialog({
   onEditBook,
   onHideBook,
   onRequestBook,
+  transactions = [],
 }: {
   account: Account | null
   book: Book
@@ -67,9 +69,10 @@ function BookDetailDialog({
   onEditBook: (book: Book) => void
   onHideBook: (book: Book) => void
   onRequestBook: (book: Book) => void
+  transactions?: BookTransaction[]
 }) {
   const isMine = book.owner_account_id === account?.id
-  const canRequest = !isMine && book.status === 'available'
+  const canRequest = !isMine && book.status === 'available' && account?.role !== 'admin'
 
   function closeThen(action: (book: Book) => void) {
     onClose()
@@ -142,6 +145,20 @@ function BookDetailDialog({
                 </dt>
                 <dd>{book.pickup_location || 'Chưa cập nhật'}</dd>
               </div>
+              {book.status === 'borrowed' && (() => {
+                const activeTx = transactions?.find(
+                  (t) => t.book_id === book.id && ['completed', 'return_requested'].includes(t.status)
+                )
+                return activeTx?.return_due_at ? (
+                  <div className="book-detail-return-due" style={{ gridColumn: '1 / -1' }}>
+                    <dt style={{ color: '#b45309', fontWeight: 800 }}>
+                      <Calendar size={15} />
+                      Ngày dự kiến trả
+                    </dt>
+                    <dd style={{ color: '#b45309', fontWeight: 800 }}>{formatDate(activeTx.return_due_at)}</dd>
+                  </div>
+                ) : null
+              })()}
             </dl>
 
             <div className="book-detail-actions">
@@ -193,6 +210,7 @@ export function BooksView({
   onHideBook,
   onRequestBook,
   onOpenBookCreate,
+  transactions = [],
 }: {
   account: Account | null
   accountMap: Map<string, Account>
@@ -213,6 +231,7 @@ export function BooksView({
   onHideBook: (book: Book) => void
   onRequestBook: (book: Book) => void
   onOpenBookCreate: () => void
+  transactions?: BookTransaction[]
 }) {
   const [bookScope, setBookScope] = useState<BookScope>('all')
   const [sortOrder, setSortOrder] = useState<BookSort>('relevance')
@@ -427,6 +446,17 @@ export function BooksView({
                       <MapPin size={14} />
                       <span>{book.pickup_location || 'Chưa cập nhật'}</span>
                     </span>
+                    {book.status === 'borrowed' && (() => {
+                      const activeTx = transactions?.find(
+                        (t) => t.book_id === book.id && ['completed', 'return_requested'].includes(t.status)
+                      )
+                      return activeTx?.return_due_at ? (
+                        <span className="book-card-return-due" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#b45309', fontWeight: 700, marginTop: '4px' }}>
+                          <Calendar size={13} />
+                          <span>Hạn trả: {formatDate(activeTx.return_due_at)}</span>
+                        </span>
+                      ) : null
+                    })()}
                   </div>
                 </div>
               </article>
@@ -449,6 +479,7 @@ export function BooksView({
           onEditBook={onEditBook}
           onHideBook={onHideBook}
           onRequestBook={onRequestBook}
+          transactions={transactions}
         />
       )}
     </div>

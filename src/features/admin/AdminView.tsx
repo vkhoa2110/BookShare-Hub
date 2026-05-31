@@ -9,6 +9,7 @@ import {
 import { ActionButton, EmptyState, PanelHeader, StatCard, StatusPill, IconOnlyButton, Field } from '../../shared/components'
 import type { Account, Book, BookTransaction, Complaint, ComplaintStatus } from '../../types/domain'
 import './admin.css'
+import { formatDate } from '../../shared/utils/date'
 
 import type { View } from '../../types/forms'
 
@@ -579,6 +580,16 @@ export function AdminView({
                           <StatusPill status={item.status}>
                             {bookStatusLabels[item.status]}
                           </StatusPill>
+                          {item.status === 'borrowed' && (() => {
+                            const activeTx = transactions?.find(
+                              (t) => t.book_id === item.id && ['completed', 'return_requested'].includes(t.status)
+                            )
+                            return activeTx?.return_due_at ? (
+                              <div style={{ fontSize: '11px', color: '#b45309', fontWeight: 700, marginTop: '4px' }}>
+                                Hạn trả: {formatDate(activeTx.return_due_at)}
+                              </div>
+                            ) : null
+                          })()}
                         </td>
                         <td>
                           <div className="flex-align-center" style={{ gap: '6px' }}>

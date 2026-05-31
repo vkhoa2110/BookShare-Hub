@@ -16,7 +16,7 @@ import {
   UserRoundPlus,
 } from 'lucide-react'
 import '../App.css'
-import { navItems, pageTitle } from './navigation'
+import { navItems } from './navigation'
 import { loadApplicationData } from './useAppData'
 import { AdminView } from '../features/admin/AdminView'
 import { BooksView } from '../features/books/BooksView'
@@ -37,13 +37,11 @@ import {
   emptyRequestForm,
   emptyReturnForm,
 } from '../features/transactions/transactionForms'
-import { roleLabels } from '../shared/constants/labels'
 import { demoAccounts } from '../shared/constants/rules'
 import {
   ActionButton,
   DemoAccounts,
   Field,
-  IconOnlyButton,
   MetricLine,
   NoticeBanner,
 } from '../shared/components'
@@ -111,7 +109,6 @@ function App() {
   const [notice, setNotice] = useState<Notice>(null)
   const [authMode, setAuthMode] = useState<AuthMode>('signin')
   const [loading, setLoading] = useState(true)
-  const [dataLoading, setDataLoading] = useState(false)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [schemaReady, setSchemaReady] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -145,8 +142,6 @@ function App() {
   }, [])
 
   const loadAppData = useCallback(async (userId: string) => {
-    setDataLoading(true)
-
     try {
       const data = await loadApplicationData(userId)
 
@@ -170,8 +165,6 @@ function App() {
         type: 'error',
         text: `Chưa đọc được dữ liệu Supabase: ${getErrorMessage(error)}`,
       })
-    } finally {
-      setDataLoading(false)
     }
   }, [])
 
@@ -866,6 +859,9 @@ function App() {
         <nav className="nav-list">
           {navItems
             .filter((item) => !item.adminOnly || account?.role === 'admin')
+            .filter((item) => !(item.view === 'complaints' && account?.role === 'admin'))
+            .filter((item) => !(item.view === 'notifications' && account?.role === 'admin'))
+            .filter((item) => !(item.view === 'deliveries' && account?.role === 'admin'))
             .map((item) => {
               const isProfile = item.view === 'profile'
               const isProfileActive = activeView.startsWith('profile')
@@ -1041,17 +1037,7 @@ function App() {
       </aside>
 
       <section className="workspace">
-        <header className="topbar">
-          <div>
-            <span className="eyebrow">{account ? roleLabels[account.role] : 'Thành viên'}</span>
-            <h1>{pageTitle(activeView)}</h1>
-          </div>
-          <div className="topbar-actions">
-            <IconOnlyButton label="Tải lại dữ liệu" onClick={refreshData} busy={dataLoading}>
-              <RefreshCw size={18} />
-            </IconOnlyButton>
-          </div>
-        </header>
+
 
         {!schemaReady && (
           <div className="setup-banner">
@@ -1119,6 +1105,7 @@ function App() {
               setRequestForm(createRequestForm(accountAddresses))
             }}
             onOpenBookCreate={openBookCreate}
+            transactions={transactions}
           />
         )}
 

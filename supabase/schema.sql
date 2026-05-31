@@ -929,6 +929,19 @@ to authenticated
 using (id = auth.uid())
 with check (id = auth.uid());
 
+drop policy if exists accounts_update_admin on public.accounts;
+create policy accounts_update_admin
+on public.accounts for update
+to authenticated
+using (public.current_account_is_admin())
+with check (public.current_account_is_admin());
+
+drop policy if exists accounts_delete_admin on public.accounts;
+create policy accounts_delete_admin
+on public.accounts for delete
+to authenticated
+using (public.current_account_is_admin());
+
 drop policy if exists account_addresses_select_own on public.account_addresses;
 create policy account_addresses_select_own
 on public.account_addresses for select

@@ -1,11 +1,19 @@
 import type { FormEvent } from 'react'
-import { MessageSquareWarning } from 'lucide-react'
+import {
+  MessageSquareWarning,
+  User,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  BookOpen,
+} from 'lucide-react'
 import { complaintStatusLabels, transactionStatusLabels } from '../../shared/constants/labels'
-import { ActionButton, EmptyState, Field, PanelHeader, StatusPill } from '../../shared/components'
-import { accountsFromTransactions } from '../../shared/utils/account'
+import { ActionButton, EmptyState, Field, StatusPill } from '../../shared/components'
+import { accountsFromTransactions, initials } from '../../shared/utils/account'
 import { formatDate } from '../../shared/utils/date'
 import type { Account, Book, BookTransaction, Complaint } from '../../types/domain'
 import type { ComplaintForm } from '../../types/forms'
+import './complaints.css'
 
 export function ComplaintsView({
   account,
@@ -36,11 +44,104 @@ export function ComplaintsView({
     : accountsFromTransactions(transactions, account?.id)
 
   return (
-    <div className="view-stack">
-      <section className="tool-panel">
-        <PanelHeader icon={MessageSquareWarning} title="Gửi khiếu nại" />
-        <form className="book-form complaint-form" onSubmit={onSubmit}>
-          <Field label="Giao dịch">
+    <div className="view-stack complaints-grid-container">
+      {/* CỘT TRÁI: DANH SÁCH KHIẾU NẠI ĐÃ GỬI */}
+      <div style={{ display: 'grid', gap: '16px' }}>
+        <section className="tool-panel" style={{ borderBottom: 'none', paddingBottom: '0' }}>
+          <span className="eyebrow" style={{ display: 'block', marginBottom: '16px' }}>Khiếu nại của tôi & hội viên</span>
+        </section>
+
+        <div className="entity-list" style={{ marginTop: 0 }}>
+          {complaints.map((complaint) => {
+            const complainant = accountMap.get(complaint.complainant_account_id)
+            const reported = accountMap.get(complaint.reported_account_id || '')
+            const transaction = transactions.find((item) => item.id === complaint.transaction_id)
+            const book = transaction ? bookMap.get(transaction.book_id) : null
+
+            return (
+              <article className="complaint-modern-card" key={complaint.id}>
+                {/* Header người khiếu nại & Trạng thái */}
+                <div className="complaint-card-header">
+                  <div className="complaint-reporter-info">
+                    <div className="reporter-avatar-mini">
+                      {initials(complainant?.full_name || 'BH')}
+                    </div>
+                    <div>
+                      <h3>{complainant?.full_name || 'Thành viên CLB'}</h3>
+                    </div>
+                  </div>
+                  <StatusPill status={complaint.status}>
+                    {complaintStatusLabels[complaint.status]}
+                  </StatusPill>
+                </div>
+
+                {/* Chi tiết nội dung khiếu nại */}
+                <div className="complaint-details-box">
+                  {complaint.complaint_details}
+                </div>
+
+                {/* Thông tin Metadata phụ */}
+                <div className="complaint-meta-row">
+                  <div className="meta-item">
+                    <User size={14} style={{ color: '#ef4444' }} />
+                    <span className="meta-text">
+                      Bị báo cáo: <strong>{reported?.full_name || 'Chưa rõ'}</strong>
+                    </span>
+                  </div>
+
+                  {book && (
+                    <div className="meta-item">
+                      <BookOpen size={14} style={{ color: '#2563eb' }} />
+                      <span className="meta-text">
+                        Sách: <strong>{book.title}</strong>
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="meta-item">
+                    <Clock size={14} />
+                    <span className="meta-text">
+                      Gửi lúc: <strong>{formatDate(complaint.created_at)}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Kết quả xử lý chính thức của Ban quản trị */}
+                {complaint.outcome && (
+                  <div className="complaint-outcome-banner">
+                    <CheckCircle2 size={16} className="outcome-icon" />
+                    <div className="outcome-content">
+                      <span>Phản hồi từ Ban Quản Trị</span>
+                      <p>{complaint.outcome}</p>
+                    </div>
+                  </div>
+                )}
+              </article>
+            )
+          })}
+          {complaints.length === 0 && (
+            <div className="tool-panel">
+              <EmptyState icon={MessageSquareWarning} text="Chưa ghi nhận đơn khiếu nại nào." />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CỘT PHẢI: FORM GỬI KHIẾU NẠI MỚI */}
+      <section className="complaint-form-panel">
+        <span className="eyebrow" style={{ display: 'block', marginBottom: '12px' }}>Tạo khiếu nại mới</span>
+        
+        {/* Banner hướng dẫn chi tiết */}
+        <div className="complaint-guidance-card">
+          <AlertTriangle size={18} className="guidance-icon" />
+          <div className="guidance-text">
+            <p>Nguyên tắc ứng xử CLB</p>
+            <span>Hãy cung cấp chi tiết sự việc, mã giao dịch cụ thể để Ban Quản Trị nhanh chóng tiến hành đối soát và bảo vệ quyền lợi chính đáng của bạn.</span>
+          </div>
+        </div>
+
+        <form className="stack-form" onSubmit={onSubmit}>
+          <Field label="Giao dịch phát sinh tranh chấp">
             <select
               value={form.transaction_id}
               onChange={(event) =>
@@ -56,12 +157,13 @@ export function ComplaintsView({
               ))}
             </select>
           </Field>
+          
           <Field label="Tài khoản bị báo cáo">
             <select
               value={form.reported_account_id}
               onChange={(event) => onFormChange({ ...form, reported_account_id: event.target.value })}
             >
-              <option value="">Chưa chọn</option>
+              <option value="">Chưa chọn đối tượng</option>
               {reportOptions.map((accountId) => (
                 <option key={accountId} value={accountId}>
                   {accountMap.get(accountId)?.full_name || 'Thành viên'}
@@ -69,53 +171,23 @@ export function ComplaintsView({
               ))}
             </select>
           </Field>
-          <Field label="Nội dung">
+          
+          <Field label="Mô tả nội dung tranh chấp">
             <textarea
               required
               rows={4}
               value={form.complaint_details}
               onChange={(event) => onFormChange({ ...form, complaint_details: event.target.value })}
-              placeholder="Nội dung khiếu nại"
+              placeholder="Vui lòng trình bày rõ ràng sự việc (Ví dụ: sách bị cũ rách hơn cam kết, không nhận được sách từ shipper, chủ sách không gửi hàng...)"
             />
           </Field>
-          <ActionButton icon={MessageSquareWarning} busy={busyKey === 'complaint-create'}>
-            Gửi khiếu nại
-          </ActionButton>
+          
+          <div style={{ marginTop: '8px' }}>
+            <ActionButton icon={MessageSquareWarning} busy={busyKey === 'complaint-create'} style={{ width: '100%' }}>
+              Gửi đơn khiếu nại
+            </ActionButton>
+          </div>
         </form>
-      </section>
-
-      <section className="entity-list">
-        {complaints.map((complaint) => (
-          <article className="entity-card" key={complaint.id}>
-            <div className="entity-main">
-              <div className="entity-icon warning">
-                <MessageSquareWarning size={22} />
-              </div>
-              <div>
-                <div className="entity-title-row">
-                  <h2>{accountMap.get(complaint.complainant_account_id)?.full_name || 'Thành viên'}</h2>
-                  <StatusPill status={complaint.status}>{complaintStatusLabels[complaint.status]}</StatusPill>
-                </div>
-                <p>{complaint.complaint_details}</p>
-                <dl className="meta-grid">
-                  <div>
-                    <dt>Bị báo cáo</dt>
-                    <dd>{accountMap.get(complaint.reported_account_id || '')?.full_name || 'Chưa chọn'}</dd>
-                  </div>
-                  <div>
-                    <dt>Tạo lúc</dt>
-                    <dd>{formatDate(complaint.created_at)}</dd>
-                  </div>
-                  <div>
-                    <dt>Kết quả</dt>
-                    <dd>{complaint.outcome || 'Chưa có'}</dd>
-                  </div>
-                </dl>
-              </div>
-            </div>
-          </article>
-        ))}
-        {complaints.length === 0 && <EmptyState icon={MessageSquareWarning} text="Chưa có khiếu nại." />}
       </section>
     </div>
   )

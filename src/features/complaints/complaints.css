@@ -1,0 +1,221 @@
+/* Custom Complaints View Styles */
+
+.complaints-grid-container {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Premium Form Panel */
+.complaint-form-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.complaint-guidance-card {
+  background: #fff7e8;
+  border: 1px solid #ecd6a9;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.guidance-icon {
+  color: #b45309;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.guidance-text p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #78350f;
+}
+
+.guidance-text span {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #92400e;
+  line-height: 1.4;
+}
+
+/* Premium Complaint Card */
+.complaint-modern-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.complaint-modern-card:hover {
+  transform: translateY(-2px);
+  border-color: #fca5a5; /* Subtle soft red highlight */
+  box-shadow: 0 10px 20px -5px rgba(239, 68, 68, 0.05);
+}
+
+.complaint-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.complaint-reporter-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.reporter-avatar-mini {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.complaint-reporter-info h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.complaint-details-box {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  color: #334155;
+  line-height: 1.5;
+}
+
+/* Metadata Row */
+.complaint-meta-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #64748b;
+  min-width: 0;
+}
+
+.meta-item svg {
+  flex-shrink: 0;
+}
+
+.meta-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-text strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Outcome Resolved Banner */
+.complaint-outcome-banner {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.outcome-icon {
+  color: #16a34a;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.outcome-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.outcome-content span {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #15803d;
+}
+
+.outcome-content p {
+  margin: 0;
+  font-size: 13px;
+  color: #166534;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .complaints-grid-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Styling form fields and enlarging labels specifically for this page */
+.complaint-form-panel .field {
+  gap: 8px;
+}
+
+.complaint-form-panel .field > span {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1e293b; /* Darker slate color for better readability */
+  text-transform: none; /* Keep natural case instead of uppercase */
+}
+
+.complaint-form-panel input,
+.complaint-form-panel select,
+.complaint-form-panel textarea {
+  font-size: 14px;
+  padding: 12px 14px;
+  min-height: 48px;
+  border-radius: 8px;
+  border-color: #cbd5e1;
+  background-color: #ffffff;
+}
+
+.complaint-form-panel textarea {
+  min-height: 120px;
+}

@@ -1,9 +1,22 @@
+import { readFile } from 'node:fs/promises'
 import pg from 'pg'
 
-const databaseUrl = process.env.DATABASE_URL
+let databaseUrl = process.env.DATABASE_URL
 
 if (!databaseUrl) {
-  console.error('DATABASE_URL is required.')
+  try {
+    const envLocal = await readFile(new URL('../.env.local', import.meta.url), 'utf8')
+    const match = envLocal.match(/^DATABASE_URL=(.+)$/m)
+    if (match) {
+      databaseUrl = match[1].trim()
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+if (!databaseUrl) {
+  console.error('DATABASE_URL is required. Please define it in process.env or in .env.local')
   process.exit(1)
 }
 

@@ -7,6 +7,20 @@ import { ActionButton, Field, IconOnlyButton } from '../../shared/components'
 import type { AccountAddress, BookCondition } from '../../types/domain'
 import type { BookForm } from '../../types/forms'
 
+const PREDEFINED_CATEGORIES = [
+  'Văn học',
+  'Kỹ năng sống / Phát triển bản thân',
+  'Kinh tế / Kinh doanh',
+  'Công nghệ / Tin học',
+  'Khoa học / Đời sống',
+  'Nghệ thuật / Thiết kế',
+  'Giáo trình / Sách giáo khoa',
+  'Ngoại ngữ',
+  'Thiếu nhi',
+  'Lịch sử / Địa lý',
+  'Khác',
+]
+
 export function BookFormBody({
   form,
   addresses,
@@ -25,6 +39,7 @@ export function BookFormBody({
   onCancel: () => void
 }) {
   const useCustomPickup = form.address_id === customAddressId || addresses.length === 0
+  const selectValue = form.category === '' ? '' : (PREDEFINED_CATEGORIES.includes(form.category) ? form.category : 'Khác')
 
   return (
     <>
@@ -53,12 +68,18 @@ export function BookFormBody({
           />
         </Field>
         <Field label="Thể loại">
-          <input
+          <select
             required
-            value={form.category}
+            value={selectValue}
             onChange={(event) => onFormChange({ ...form, category: event.target.value })}
-            placeholder="Kỹ năng, văn học..."
-          />
+          >
+            <option value="">-- Chọn thể loại --</option>
+            {PREDEFINED_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Tác giả">
           <input
