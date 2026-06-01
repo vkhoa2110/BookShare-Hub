@@ -1,6 +1,5 @@
 export { ActionButton } from './ActionButton'
 export { BookLine, LedgerLine, MetricLine, StatCard } from './DataDisplay'
-export { DemoAccounts } from './DemoAccounts'
 export { EmptyState } from './EmptyState'
 export { Field } from './Field'
 export { IconOnlyButton } from './IconOnlyButton'

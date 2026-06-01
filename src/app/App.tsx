@@ -37,10 +37,8 @@ import {
   emptyRequestForm,
   emptyReturnForm,
 } from '../features/transactions/transactionForms'
-import { demoAccounts } from '../shared/constants/rules'
 import {
   ActionButton,
-  DemoAccounts,
   Field,
   MetricLine,
   NoticeBanner,
@@ -409,16 +407,6 @@ function App() {
     clearLocalData()
     setIsBookCreateOpen(false)
     handleViewChange('dashboard')
-  }
-
-  function useDemoAccount(email: string, password: string) {
-    setAuthMode('signin')
-    setAuthForm({
-      full_name: '',
-      phone_number: '',
-      email,
-      password,
-    })
   }
 
   async function handleBookSubmit(event: FormEvent<HTMLFormElement>) {
@@ -800,8 +788,6 @@ function App() {
           </div>
 
           {notice && <NoticeBanner notice={notice} onClose={() => setNotice(null)} />}
-
-          {authMode === 'signin' && <DemoAccounts accounts={demoAccounts} onUse={useDemoAccount} />}
 
           <form className="stack-form" onSubmit={handleAuth}>
             {authMode === 'signup' && (
