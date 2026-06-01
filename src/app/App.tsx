@@ -707,9 +707,7 @@ function App() {
     await runAction(`book-delete-${bookId}`, 'Đã xóa sách thành công.', async () => {
       const { error } = await deleteBookService(bookId)
       if (error) {
-        throw new Error(
-          'Không thể xóa sách này vì đã có lịch sử giao dịch liên quan. Bạn có thể ẩn sách để thay thế.',
-        )
+        throw error
       }
     })
   }

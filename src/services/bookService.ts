@@ -54,5 +54,5 @@ export async function updateBookStatus(bookId: string, status: BookStatus) {
 }
 
 export async function deleteBook(bookId: string) {
-  return supabase.from('books').delete().eq('id', bookId)
+  return supabase.rpc('admin_delete_book', { p_book_id: bookId })
 }

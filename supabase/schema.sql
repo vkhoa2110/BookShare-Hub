@@ -364,6 +364,35 @@ begin
 end;
 $$;
 
+create or replace function public.admin_delete_book(p_book_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.current_account_is_admin() then
+    raise exception 'Chi quan tri vien moi duoc xoa sach'
+      using errcode = '42501';
+  end if;
+
+  perform 1
+  from public.books
+  where id = p_book_id
+  for update;
+
+  if not found then
+    raise exception 'Khong tim thay sach';
+  end if;
+
+  delete from public.book_transactions
+  where book_id = p_book_id;
+
+  delete from public.books
+  where id = p_book_id;
+end;
+$$;
+
 create or replace function public.create_transaction_request(
   p_book_id uuid,
   p_transaction_type text,
@@ -1179,6 +1208,7 @@ to authenticated
 using (bucket_id = 'book-covers' and name like auth.uid()::text || '/%');
 
 revoke execute on function public.add_points(uuid, integer, text, uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.admin_delete_book(uuid) from public, anon, authenticated;
 revoke execute on function public.admin_update_account(uuid, text, text, text, integer, boolean) from public, anon, authenticated;
 revoke execute on function public.create_transaction_request(uuid, text, text, timestamptz, text, text) from public, anon;
 revoke execute on function public.respond_transaction(uuid, boolean, text) from public, anon;
@@ -1199,6 +1229,7 @@ grant select, insert, update, delete on public.books to authenticated;
 grant select on public.book_transactions, public.transaction_history, public.deliveries, public.point_ledger to authenticated;
 grant select, insert on public.complaints to authenticated;
 grant update on public.complaints to authenticated;
+grant execute on function public.admin_delete_book(uuid) to authenticated;
 grant execute on function public.admin_update_account(uuid, text, text, text, integer, boolean) to authenticated;
 grant execute on function public.create_transaction_request(uuid, text, text, timestamptz, text, text) to authenticated;
 grant execute on function public.respond_transaction(uuid, boolean, text) to authenticated;
