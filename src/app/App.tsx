@@ -37,12 +37,7 @@ import {
   emptyRequestForm,
   emptyReturnForm,
 } from '../features/transactions/transactionForms'
-import {
-  ActionButton,
-  Field,
-  MetricLine,
-  NoticeBanner,
-} from '../shared/components'
+import { ActionButton, Field, MetricLine, NoticeBanner } from '../shared/components'
 import { addressIdForValue } from '../shared/utils/address'
 import { getErrorMessage } from '../shared/utils/errors'
 import { initials } from '../shared/utils/account'
@@ -55,7 +50,11 @@ import {
   saveAddress,
   updateAccountProfile,
 } from '../services/accountService'
-import { deleteBook as deleteBookService, saveBook, updateBookStatus as saveBookStatus } from '../services/bookService'
+import {
+  deleteBook as deleteBookService,
+  saveBook,
+  updateBookStatus as saveBookStatus,
+} from '../services/bookService'
 import { createComplaint, updateComplaintStatus as saveComplaintStatus } from '../services/complaintService'
 import { takeDelivery as takeDeliveryOrder, updateDeliveryStatus } from '../services/deliveryService'
 import {
@@ -454,7 +453,7 @@ function App() {
       cover_image_url: book.cover_image_url || null,
       cover_file: null,
     })
-    handleViewChange('books')
+    handleViewChange(account?.role === 'admin' ? 'admin-books' : 'books')
   }
 
   function resetBookForm() {
@@ -708,7 +707,9 @@ function App() {
     await runAction(`book-delete-${bookId}`, 'Đã xóa sách thành công.', async () => {
       const { error } = await deleteBookService(bookId)
       if (error) {
-        throw new Error('Không thể xóa sách này vì đã có lịch sử giao dịch liên quan. Bạn có thể ẩn sách để thay thế.')
+        throw new Error(
+          'Không thể xóa sách này vì đã có lịch sử giao dịch liên quan. Bạn có thể ẩn sách để thay thế.',
+        )
       }
     })
   }
@@ -721,7 +722,7 @@ function App() {
       role: 'member' | 'volunteer' | 'admin'
       points: number
       status: boolean
-    }
+    },
   ) {
     return runAction(`account-update-${accountId}`, 'Đã cập nhật tài khoản thành công.', async () => {
       const { error } = await adminUpdateAccountService(accountId, payload)
@@ -739,7 +740,9 @@ function App() {
     await runAction(`account-delete-${accountId}`, 'Đã xóa thành viên thành công.', async () => {
       const { error } = await adminDeleteAccountService(accountId)
       if (error) {
-        throw new Error('Không thể xóa thành viên này do ràng buộc khóa ngoại (ví dụ: đã có sách đăng ký hoặc lịch sử giao dịch gắn liền). Hãy khóa tài khoản để thay thế.')
+        throw new Error(
+          'Không thể xóa thành viên này do ràng buộc khóa ngoại (ví dụ: đã có sách đăng ký hoặc lịch sử giao dịch gắn liền). Hãy khóa tài khoản để thay thế.',
+        )
       }
     })
   }
@@ -969,7 +972,9 @@ function App() {
                       <div className="sub-nav-list">
                         <button
                           type="button"
-                          className={activeView === 'admin-overview' || activeView === 'admin' ? 'active' : ''}
+                          className={
+                            activeView === 'admin-overview' || activeView === 'admin' ? 'active' : ''
+                          }
                           onClick={() => handleViewChange('admin-overview')}
                         >
                           <Library size={16} />
@@ -1024,9 +1029,7 @@ function App() {
             <div className="avatar">{initials(account?.full_name || session.user.email || 'BH')}</div>
             <div>
               <strong>{account?.full_name || session.user.email}</strong>
-              <span>
-                {account?.role === 'admin' ? 'Quản trị viên' : `${account?.points ?? 0} điểm`}
-              </span>
+              <span>{account?.role === 'admin' ? 'Quản trị viên' : `${account?.points ?? 0} điểm`}</span>
             </div>
           </div>
           <ActionButton icon={LogOut} variant="secondary" onClick={handleSignOut}>
@@ -1036,8 +1039,6 @@ function App() {
       </aside>
 
       <section className="workspace">
-
-
         {!schemaReady && (
           <div className="setup-banner">
             <AlertTriangle size={18} />
@@ -1189,11 +1190,17 @@ function App() {
             complaints={complaints}
             accountMap={accountMap}
             bookMap={bookMap}
+            addressOptions={accountAddresses}
+            bookForm={bookForm}
+            editingBookId={editingBookId}
             busyKey={busyKey}
             onUpdateComplaint={updateComplaintStatus}
             onTabChange={handleViewChange}
             onDeleteBook={handleDeleteBook}
             onEditBook={startEditBook}
+            onBookFormChange={setBookForm}
+            onBookSubmit={handleBookSubmit}
+            onResetBookForm={resetBookForm}
             onUpdateAccount={handleUpdateAccount}
             onDeleteAccount={handleDeleteAccount}
           />

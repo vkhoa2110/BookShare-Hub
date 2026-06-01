@@ -1,17 +1,47 @@
 import { useState } from 'react'
-import { ArrowRightLeft, BookOpen, Check, MessageSquareWarning, UserRound, Search, Pencil, Trash2, X, Handshake, Library, ShieldAlert } from 'lucide-react'
+import type { FormEvent } from 'react'
+import {
+  ArrowRightLeft,
+  BookOpen,
+  Check,
+  MessageSquareWarning,
+  UserRound,
+  Search,
+  Pencil,
+  Trash2,
+  X,
+  Handshake,
+  Library,
+  ShieldAlert,
+} from 'lucide-react'
 import {
   bookStatusLabels,
   complaintStatusLabels,
   conditionLabels,
   roleLabels,
 } from '../../shared/constants/labels'
-import { ActionButton, EmptyState, PanelHeader, StatCard, StatusPill, IconOnlyButton, Field } from '../../shared/components'
-import type { Account, Book, BookTransaction, Complaint, ComplaintStatus } from '../../types/domain'
+import {
+  ActionButton,
+  EmptyState,
+  PanelHeader,
+  StatCard,
+  StatusPill,
+  IconOnlyButton,
+  Field,
+} from '../../shared/components'
+import type {
+  Account,
+  AccountAddress,
+  Book,
+  BookTransaction,
+  Complaint,
+  ComplaintStatus,
+} from '../../types/domain'
 import './admin.css'
 import { formatDate } from '../../shared/utils/date'
+import { BookFormBody } from '../books/BookFormModal'
 
-import type { View } from '../../types/forms'
+import type { BookForm, View } from '../../types/forms'
 
 type AdminSubTab = 'overview' | 'members' | 'books' | 'complaints'
 
@@ -23,11 +53,17 @@ export function AdminView({
   complaints,
   accountMap,
   bookMap,
+  addressOptions,
+  bookForm,
+  editingBookId,
   busyKey,
   onUpdateComplaint,
   onTabChange,
   onDeleteBook,
   onEditBook,
+  onBookFormChange,
+  onBookSubmit,
+  onResetBookForm,
   onUpdateAccount,
   onDeleteAccount,
 }: {
@@ -38,11 +74,17 @@ export function AdminView({
   complaints: Complaint[]
   accountMap: Map<string, Account>
   bookMap: Map<string, Book>
+  addressOptions: AccountAddress[]
+  bookForm: BookForm
+  editingBookId: string | null
   busyKey: string | null
   onUpdateComplaint: (complaintId: string, status: ComplaintStatus, outcome: string) => void
   onTabChange: (view: View) => void
   onDeleteBook: (bookId: string) => void
   onEditBook: (book: Book) => void
+  onBookFormChange: (value: BookForm) => void
+  onBookSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onResetBookForm: () => void
   onUpdateAccount: (
     accountId: string,
     payload: {
@@ -51,13 +93,14 @@ export function AdminView({
       role: 'member' | 'volunteer' | 'admin'
       points: number
       status: boolean
-    }
+    },
   ) => Promise<boolean>
   onDeleteAccount: (accountId: string) => void
 }) {
-  const activeTab = subView === 'admin' || subView === 'admin-overview'
-    ? 'overview'
-    : (subView.replace('admin-', '') as AdminSubTab)
+  const activeTab =
+    subView === 'admin' || subView === 'admin-overview'
+      ? 'overview'
+      : (subView.replace('admin-', '') as AdminSubTab)
 
   const setActiveTab = (tab: AdminSubTab) => {
     onTabChange(`admin-${tab}` as View)
@@ -88,7 +131,7 @@ export function AdminView({
     })
   }
 
-  const handleSaveAccount = async (e: React.FormEvent) => {
+  const handleSaveAccount = async (e: FormEvent) => {
     e.preventDefault()
     if (!editingAccount) return
 
@@ -155,8 +198,6 @@ export function AdminView({
 
   return (
     <div className="view-stack">
-
-
       {/* PHÂN HỆ: TỔNG QUAN */}
       {activeTab === 'overview' && (
         <>
@@ -224,16 +265,16 @@ export function AdminView({
                                 {item.status === 'requested'
                                   ? 'Đang yêu cầu'
                                   : item.status === 'accepted'
-                                  ? 'Đã duyệt'
-                                  : item.status === 'delivered'
-                                  ? 'Đã giao'
-                                  : item.status === 'completed'
-                                  ? 'Hoàn thành'
-                                  : item.status === 'rejected'
-                                  ? 'Từ chối'
-                                  : item.status === 'return_requested'
-                                  ? 'Yêu cầu trả'
-                                  : item.status}
+                                    ? 'Đã duyệt'
+                                    : item.status === 'delivered'
+                                      ? 'Đã giao'
+                                      : item.status === 'completed'
+                                        ? 'Hoàn thành'
+                                        : item.status === 'rejected'
+                                          ? 'Từ chối'
+                                          : item.status === 'return_requested'
+                                            ? 'Yêu cầu trả'
+                                            : item.status}
                               </StatusPill>
                             </td>
                           </tr>
@@ -262,14 +303,16 @@ export function AdminView({
                   .sort((a, b) => b.points - a.points)
                   .slice(0, 5)
                   .map((item, idx) => {
-                    const initialsLabel = item.full_name
-                      .split(' ')
-                      .slice(-2)
-                      .map((n) => n[0])
-                      .join('')
-                      .toUpperCase() || 'TV'
-                    
-                    const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-other'
+                    const initialsLabel =
+                      item.full_name
+                        .split(' ')
+                        .slice(-2)
+                        .map((n) => n[0])
+                        .join('')
+                        .toUpperCase() || 'TV'
+
+                    const rankClass =
+                      idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-other'
 
                     return (
                       <div className="dashboard-list-item" key={item.id}>
@@ -289,7 +332,9 @@ export function AdminView({
 
           <div className="dashboard-section-header">
             <h2>Kiểm duyệt nội dung & Khiếu nại</h2>
-            <p>Xem sách mới đưa lên kệ để kiểm duyệt và nhanh chóng xử lý các khiếu nại tranh chấp phát sinh</p>
+            <p>
+              Xem sách mới đưa lên kệ để kiểm duyệt và nhanh chóng xử lý các khiếu nại tranh chấp phát sinh
+            </p>
           </div>
 
           <div className="dashboard-grid-equal-col">
@@ -332,7 +377,19 @@ export function AdminView({
                                     style={{ width: '24px', height: '32px' }}
                                   />
                                 ) : (
-                                  <div className="book-cover-mini flex-align-center" style={{ width: '24px', height: '32px', justifyContent: 'center', fontSize: '0.5rem', color: '#94a3b8', border: '1px dashed #cbd5e1' }}>N/A</div>
+                                  <div
+                                    className="book-cover-mini flex-align-center"
+                                    style={{
+                                      width: '24px',
+                                      height: '32px',
+                                      justifyContent: 'center',
+                                      fontSize: '0.5rem',
+                                      color: '#94a3b8',
+                                      border: '1px dashed #cbd5e1',
+                                    }}
+                                  >
+                                    N/A
+                                  </div>
                                 )}
                                 <span style={{ fontWeight: 700 }}>{item.title}</span>
                               </div>
@@ -340,8 +397,17 @@ export function AdminView({
                             <td>{item.category}</td>
                             <td>{owner?.full_name || 'Chủ sách'}</td>
                             <td>
-                              <span className={`condition-tag ${item.condition}`} style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
-                                {item.condition === 'new' ? 'Mới' : item.condition === 'good' ? 'Tốt' : item.condition === 'used' ? 'Đã dùng' : 'Cũ'}
+                              <span
+                                className={`condition-tag ${item.condition}`}
+                                style={{ fontSize: '0.7rem', padding: '2px 6px' }}
+                              >
+                                {item.condition === 'new'
+                                  ? 'Mới'
+                                  : item.condition === 'good'
+                                    ? 'Tốt'
+                                    : item.condition === 'used'
+                                      ? 'Đã dùng'
+                                      : 'Cũ'}
                               </span>
                             </td>
                           </tr>
@@ -360,7 +426,11 @@ export function AdminView({
                   <MessageSquareWarning size={18} />
                   <h3>Khiếu nại chưa xử lý</h3>
                 </div>
-                <button type="button" className="dashboard-card-link" onClick={() => setActiveTab('complaints')}>
+                <button
+                  type="button"
+                  className="dashboard-card-link"
+                  onClick={() => setActiveTab('complaints')}
+                >
                   Xem tất cả
                 </button>
               </div>
@@ -383,7 +453,14 @@ export function AdminView({
                             </StatusPill>
                           </div>
                           <p className="details">{item.complaint_details}</p>
-                          <div style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 600, marginTop: '2px' }}>
+                          <div
+                            style={{
+                              fontSize: '0.7rem',
+                              color: '#b45309',
+                              fontWeight: 600,
+                              marginTop: '2px',
+                            }}
+                          >
                             Đối tượng bị báo cáo: {reported?.full_name || 'Chưa rõ'}
                           </div>
                         </div>
@@ -400,7 +477,7 @@ export function AdminView({
       {activeTab === 'members' && (
         <section className="tool-panel">
           <PanelHeader icon={UserRound} title="Quản trị Thành viên" />
-          
+
           {/* Thanh tìm kiếm & lọc thành viên */}
           <div className="admin-panel-filters">
             <div className="search-wrapper">
@@ -455,9 +532,7 @@ export function AdminView({
                       <td style={{ fontWeight: 700 }}>{item.full_name}</td>
                       <td>{item.email_address}</td>
                       <td>
-                        <span className={`role-badge ${item.role}`}>
-                          {roleLabels[item.role]}
-                        </span>
+                        <span className={`role-badge ${item.role}`}>{roleLabels[item.role]}</span>
                       </td>
                       <td style={{ fontWeight: 700, color: '#4f46e5' }}>
                         {item.role === 'admin' ? '—' : item.points}
@@ -469,10 +544,7 @@ export function AdminView({
                       </td>
                       <td>
                         <div className="flex-align-center" style={{ gap: '6px' }}>
-                          <IconOnlyButton
-                            label="Sửa thành viên"
-                            onClick={() => startEditAccount(item)}
-                          >
+                          <IconOnlyButton label="Sửa thành viên" onClick={() => startEditAccount(item)}>
                             <Pencil size={15} style={{ color: '#4f46e5' }} />
                           </IconOnlyButton>
                           <IconOnlyButton
@@ -495,130 +567,167 @@ export function AdminView({
 
       {/* PHÂN HỆ: QUẢN TRỊ KHO SÁCH */}
       {activeTab === 'books' && (
-        <section className="tool-panel">
-          <PanelHeader icon={BookOpen} title="Quản trị Kho Sách" />
-          
-          {/* Thanh tìm kiếm & lọc sách */}
-          <div className="admin-panel-filters">
-            <div className="search-wrapper">
-              <Search size={16} className="search-icon" />
-              <input
-                type="text"
-                placeholder="Tìm theo tên sách, tác giả, chủ sách, thể loại..."
-                value={bookSearch}
-                onChange={(e) => setBookSearch(e.target.value)}
-                className="search-input"
-              />
-            </div>
-            <div className="filters-group">
-              <div className="filter-item">
-                <label>Tình trạng:</label>
-                <select value={bookConditionFilter} onChange={(e) => setBookConditionFilter(e.target.value)}>
-                  <option value="all">Tất cả</option>
-                  <option value="new">Mới</option>
-                  <option value="good">Tốt</option>
-                  <option value="used">Đã dùng</option>
-                  <option value="worn">Cũ</option>
-                </select>
-              </div>
-              <div className="filter-item">
-                <label>Trạng thái sách:</label>
-                <select value={bookStatusFilter} onChange={(e) => setBookStatusFilter(e.target.value)}>
-                  <option value="all">Tất cả</option>
-                  <option value="available">Có sẵn</option>
-                  <option value="negotiating">Đang giao dịch</option>
-                  <option value="exchanged">Đã trao đổi</option>
-                  <option value="borrowed">Đang cho mượn</option>
-                  <option value="returned">Đã trả</option>
-                  <option value="hidden">Đã ẩn</option>
-                </select>
-              </div>
-            </div>
-          </div>
+        <>
+          {editingBookId && (
+            <section className="tool-panel book-edit-panel">
+              <PanelHeader icon={Pencil} title="Sửa sách" />
+              <form className="book-form redesigned book-edit-form" onSubmit={onBookSubmit}>
+                <BookFormBody
+                  form={bookForm}
+                  addresses={addressOptions}
+                  submitIcon={Check}
+                  submitLabel="Lưu sách"
+                  busy={busyKey === 'book-update'}
+                  onFormChange={onBookFormChange}
+                  onCancel={onResetBookForm}
+                />
+              </form>
+            </section>
+          )}
 
-          <div className="table-wrap">
-            {filteredBooks.length === 0 ? (
-              <EmptyState icon={BookOpen} text="Không tìm thấy sách nào khớp bộ lọc." />
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Thông tin Sách</th>
-                    <th>Tác giả</th>
-                    <th>Thể loại</th>
-                    <th>Chủ sở hữu</th>
-                    <th>Tình trạng</th>
-                    <th>Trạng thái</th>
-                    <th>Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBooks.map((item) => {
-                    const owner = accountMap.get(item.owner_account_id)
-                    return (
-                      <tr key={item.id}>
-                        <td>
-                          <div className="flex-align-center">
-                            {item.cover_image_url ? (
-                              <img
-                                src={item.cover_image_url}
-                                alt={`Bìa ${item.title}`}
-                                className="book-cover-mini"
-                              />
-                            ) : (
-                              <div className="book-cover-mini flex-align-center" style={{ justifyContent: 'center', fontSize: '0.65rem', color: '#94a3b8', border: '1px dashed #cbd5e1' }}>N/A</div>
-                            )}
-                            <span className="book-title-mini">{item.title}</span>
-                          </div>
-                        </td>
-                        <td>{item.author}</td>
-                        <td>{item.category}</td>
-                        <td style={{ fontWeight: 600 }}>{owner?.full_name || 'Chủ sách'}</td>
-                        <td>
-                          <span className={`condition-tag ${item.condition}`}>
-                            {conditionLabels[item.condition]}
-                          </span>
-                        </td>
-                        <td>
-                          <StatusPill status={item.status}>
-                            {bookStatusLabels[item.status]}
-                          </StatusPill>
-                          {item.status === 'borrowed' && (() => {
-                            const activeTx = transactions?.find(
-                              (t) => t.book_id === item.id && ['completed', 'return_requested'].includes(t.status)
-                            )
-                            return activeTx?.return_due_at ? (
-                              <div style={{ fontSize: '11px', color: '#b45309', fontWeight: 700, marginTop: '4px' }}>
-                                Hạn trả: {formatDate(activeTx.return_due_at)}
-                              </div>
-                            ) : null
-                          })()}
-                        </td>
-                        <td>
-                          <div className="flex-align-center" style={{ gap: '6px' }}>
-                            <IconOnlyButton
-                              label="Sửa sách"
-                              onClick={() => onEditBook(item)}
-                            >
-                              <Pencil size={15} style={{ color: '#4f46e5' }} />
-                            </IconOnlyButton>
-                            <IconOnlyButton
-                              label="Xóa sách"
-                              onClick={() => onDeleteBook(item.id)}
-                              busy={busyKey === `book-delete-${item.id}`}
-                            >
-                              <Trash2 size={15} style={{ color: '#dc2626' }} />
-                            </IconOnlyButton>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
+          <section className="tool-panel">
+            <PanelHeader icon={BookOpen} title="Quản trị Kho Sách" />
+
+            {/* Thanh tìm kiếm & lọc sách */}
+            <div className="admin-panel-filters">
+              <div className="search-wrapper">
+                <Search size={16} className="search-icon" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên sách, tác giả, chủ sách, thể loại..."
+                  value={bookSearch}
+                  onChange={(e) => setBookSearch(e.target.value)}
+                  className="search-input"
+                />
+              </div>
+              <div className="filters-group">
+                <div className="filter-item">
+                  <label>Tình trạng:</label>
+                  <select
+                    value={bookConditionFilter}
+                    onChange={(e) => setBookConditionFilter(e.target.value)}
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="new">Mới</option>
+                    <option value="good">Tốt</option>
+                    <option value="used">Đã dùng</option>
+                    <option value="worn">Cũ</option>
+                  </select>
+                </div>
+                <div className="filter-item">
+                  <label>Trạng thái sách:</label>
+                  <select value={bookStatusFilter} onChange={(e) => setBookStatusFilter(e.target.value)}>
+                    <option value="all">Tất cả</option>
+                    <option value="available">Có sẵn</option>
+                    <option value="negotiating">Đang giao dịch</option>
+                    <option value="exchanged">Đã trao đổi</option>
+                    <option value="borrowed">Đang cho mượn</option>
+                    <option value="returned">Đã trả</option>
+                    <option value="hidden">Đã ẩn</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="table-wrap">
+              {filteredBooks.length === 0 ? (
+                <EmptyState icon={BookOpen} text="Không tìm thấy sách nào khớp bộ lọc." />
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Thông tin Sách</th>
+                      <th>Tác giả</th>
+                      <th>Thể loại</th>
+                      <th>Chủ sở hữu</th>
+                      <th>Tình trạng</th>
+                      <th>Trạng thái</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBooks.map((item) => {
+                      const owner = accountMap.get(item.owner_account_id)
+                      return (
+                        <tr key={item.id}>
+                          <td>
+                            <div className="flex-align-center">
+                              {item.cover_image_url ? (
+                                <img
+                                  src={item.cover_image_url}
+                                  alt={`Bìa ${item.title}`}
+                                  className="book-cover-mini"
+                                />
+                              ) : (
+                                <div
+                                  className="book-cover-mini flex-align-center"
+                                  style={{
+                                    justifyContent: 'center',
+                                    fontSize: '0.65rem',
+                                    color: '#94a3b8',
+                                    border: '1px dashed #cbd5e1',
+                                  }}
+                                >
+                                  N/A
+                                </div>
+                              )}
+                              <span className="book-title-mini">{item.title}</span>
+                            </div>
+                          </td>
+                          <td>{item.author}</td>
+                          <td>{item.category}</td>
+                          <td style={{ fontWeight: 600 }}>{owner?.full_name || 'Chủ sách'}</td>
+                          <td>
+                            <span className={`condition-tag ${item.condition}`}>
+                              {conditionLabels[item.condition]}
+                            </span>
+                          </td>
+                          <td>
+                            <StatusPill status={item.status}>{bookStatusLabels[item.status]}</StatusPill>
+                            {item.status === 'borrowed' &&
+                              (() => {
+                                const activeTx = transactions?.find(
+                                  (t) =>
+                                    t.book_id === item.id &&
+                                    ['completed', 'return_requested'].includes(t.status),
+                                )
+                                return activeTx?.return_due_at ? (
+                                  <div
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#b45309',
+                                      fontWeight: 700,
+                                      marginTop: '4px',
+                                    }}
+                                  >
+                                    Hạn trả: {formatDate(activeTx.return_due_at)}
+                                  </div>
+                                ) : null
+                              })()}
+                          </td>
+                          <td>
+                            <div className="flex-align-center" style={{ gap: '6px' }}>
+                              <IconOnlyButton label="Sửa sách" onClick={() => onEditBook(item)}>
+                                <Pencil size={15} style={{ color: '#4f46e5' }} />
+                              </IconOnlyButton>
+                              <IconOnlyButton
+                                label="Xóa sách"
+                                onClick={() => onDeleteBook(item.id)}
+                                busy={busyKey === `book-delete-${item.id}`}
+                              >
+                                <Trash2 size={15} style={{ color: '#dc2626' }} />
+                              </IconOnlyButton>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </section>
+        </>
       )}
 
       {/* PHÂN HỆ: XỬ LÝ KHIẾU NẠI */}
@@ -711,7 +820,13 @@ export function AdminView({
       {/* DIALOG SỬA THÀNH VIÊN */}
       {editingAccount && (
         <div className="dialog-backdrop" role="presentation">
-          <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="member-edit-title" style={{ maxWidth: '480px' }}>
+          <section
+            className="dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="member-edit-title"
+            style={{ maxWidth: '480px' }}
+          >
             <div className="dialog-header">
               <div>
                 <span className="eyebrow">Quản trị thành viên</span>
@@ -740,7 +855,12 @@ export function AdminView({
               <Field label="Vai trò">
                 <select
                   value={accountForm.role}
-                  onChange={(e) => setAccountForm({ ...accountForm, role: e.target.value as 'member' | 'volunteer' | 'admin' })}
+                  onChange={(e) =>
+                    setAccountForm({
+                      ...accountForm,
+                      role: e.target.value as 'member' | 'volunteer' | 'admin',
+                    })
+                  }
                 >
                   <option value="member">Thành viên</option>
                   <option value="volunteer">Người giao sách</option>

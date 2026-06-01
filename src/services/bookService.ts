@@ -34,8 +34,7 @@ export async function saveBook(accountId: string, form: BookForm, editingBookId:
   const coverImageUrl = form.cover_file
     ? await uploadBookCover(accountId, form.cover_file)
     : form.cover_image_url
-  const payload = {
-    owner_account_id: accountId,
+  const bookFields = {
     title: form.title.trim(),
     category: form.category.trim(),
     author: form.author.trim(),
@@ -46,8 +45,8 @@ export async function saveBook(accountId: string, form: BookForm, editingBookId:
   }
 
   return editingBookId
-    ? supabase.from('books').update(payload).eq('id', editingBookId)
-    : supabase.from('books').insert(payload)
+    ? supabase.from('books').update(bookFields).eq('id', editingBookId)
+    : supabase.from('books').insert({ ...bookFields, owner_account_id: accountId })
 }
 
 export async function updateBookStatus(bookId: string, status: BookStatus) {

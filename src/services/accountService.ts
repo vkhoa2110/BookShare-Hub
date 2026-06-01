@@ -118,9 +118,16 @@ export async function adminUpdateAccount(
     role: 'member' | 'volunteer' | 'admin'
     points: number
     status: boolean
-  }
+  },
 ) {
-  return supabase.from('accounts').update(payload).eq('id', accountId)
+  return supabase.rpc('admin_update_account', {
+    p_account_id: accountId,
+    p_full_name: payload.full_name,
+    p_phone_number: payload.phone_number,
+    p_role: payload.role,
+    p_points: payload.points,
+    p_status: payload.status,
+  })
 }
 
 export async function adminDeleteAccount(accountId: string) {

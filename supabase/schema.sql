@@ -289,6 +289,81 @@ begin
 end;
 $$;
 
+create or replace function public.admin_update_account(
+  p_account_id uuid,
+  p_full_name text,
+  p_phone_number text,
+  p_role text,
+  p_points integer,
+  p_status boolean
+)
+returns public.accounts
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_previous_points integer;
+  v_next_points integer;
+  v_account public.accounts%rowtype;
+begin
+  if not public.current_account_is_admin() then
+    raise exception 'Chi quan tri vien moi duoc cap nhat thanh vien'
+      using errcode = '42501';
+  end if;
+
+  if p_role not in ('member', 'volunteer', 'admin') then
+    raise exception 'Vai tro khong hop le';
+  end if;
+
+  if coalesce(trim(p_full_name), '') = '' then
+    raise exception 'Ho ten khong duoc de trong';
+  end if;
+
+  v_next_points := case when p_role = 'admin' then 0 else coalesce(p_points, 0) end;
+
+  if v_next_points < 0 then
+    raise exception 'Diem khong duoc am';
+  end if;
+
+  select points into v_previous_points
+  from public.accounts
+  where id = p_account_id
+  for update;
+
+  if not found then
+    raise exception 'Khong tim thay tai khoan';
+  end if;
+
+  update public.accounts
+  set
+    full_name = trim(p_full_name),
+    phone_number = nullif(trim(coalesce(p_phone_number, '')), ''),
+    role = p_role,
+    points = v_next_points,
+    status = coalesce(p_status, true)
+  where id = p_account_id
+  returning * into v_account;
+
+  if v_previous_points <> v_account.points then
+    insert into public.point_ledger (
+      account_id,
+      delta,
+      balance_after,
+      reason
+    )
+    values (
+      p_account_id,
+      v_account.points - v_previous_points,
+      v_account.points,
+      'Admin dieu chinh diem'
+    );
+  end if;
+
+  return v_account;
+end;
+$$;
+
 create or replace function public.create_transaction_request(
   p_book_id uuid,
   p_transaction_type text,
@@ -986,6 +1061,12 @@ to authenticated
 using (owner_account_id = auth.uid() or public.current_account_is_admin())
 with check (owner_account_id = auth.uid() or public.current_account_is_admin());
 
+drop policy if exists books_delete_admin on public.books;
+create policy books_delete_admin
+on public.books for delete
+to authenticated
+using (public.current_account_is_admin());
+
 drop policy if exists transactions_select_participants on public.book_transactions;
 create policy transactions_select_participants
 on public.book_transactions for select
@@ -1098,6 +1179,7 @@ to authenticated
 using (bucket_id = 'book-covers' and name like auth.uid()::text || '/%');
 
 revoke execute on function public.add_points(uuid, integer, text, uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.admin_update_account(uuid, text, text, text, integer, boolean) from public, anon, authenticated;
 revoke execute on function public.create_transaction_request(uuid, text, text, timestamptz, text, text) from public, anon;
 revoke execute on function public.respond_transaction(uuid, boolean, text) from public, anon;
 revoke execute on function public.confirm_transaction(uuid) from public, anon;
@@ -1111,11 +1193,13 @@ grant usage on schema public to authenticated, anon;
 grant select on public.accounts, public.account_addresses, public.books to authenticated;
 grant insert (id, full_name, phone_number, email_address) on public.accounts to authenticated;
 grant update (full_name, phone_number) on public.accounts to authenticated;
+grant delete on public.accounts to authenticated;
 grant insert, update, delete on public.account_addresses to authenticated;
-grant select, insert, update on public.books to authenticated;
+grant select, insert, update, delete on public.books to authenticated;
 grant select on public.book_transactions, public.transaction_history, public.deliveries, public.point_ledger to authenticated;
 grant select, insert on public.complaints to authenticated;
 grant update on public.complaints to authenticated;
+grant execute on function public.admin_update_account(uuid, text, text, text, integer, boolean) to authenticated;
 grant execute on function public.create_transaction_request(uuid, text, text, timestamptz, text, text) to authenticated;
 grant execute on function public.respond_transaction(uuid, boolean, text) to authenticated;
 grant execute on function public.confirm_transaction(uuid) to authenticated;
