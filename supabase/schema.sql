@@ -245,6 +245,29 @@ as $$
   );
 $$;
 
+create or replace function public.current_account_can_view_delivery_transaction(p_transaction_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.deliveries d
+    join public.accounts a on a.id = auth.uid()
+    where d.transaction_id = p_transaction_id
+      and a.status = true
+      and (
+        a.role = 'admin'
+        or (
+          a.role = 'volunteer'
+          and (d.status = 'open' or d.volunteer_account_id = auth.uid())
+        )
+      )
+  );
+$$;
+
 create or replace function public.add_points(
   p_account_id uuid,
   p_delta integer,
@@ -1104,6 +1127,7 @@ using (
   owner_account_id = auth.uid()
   or borrower_account_id = auth.uid()
   or public.current_account_is_admin()
+  or public.current_account_can_view_delivery_transaction(id)
 );
 
 drop policy if exists transaction_history_select_participants on public.transaction_history;
